@@ -1,0 +1,55 @@
+// 鲸屿设计变量。在 uni.scss 中 @import 后全局可用。
+// 原型按 375px 设计，这里已换算为 rpx（×2）。
+
+// 颜色
+$milk: #FBF4F0;      // 页面底色
+$card: #FFFFFF;      // 卡片
+$mocha: #6E5446;     // 主色：按钮、选中态、品牌字
+$rose: #D4A39B;      // 雾玫瑰：选中描边、待确认
+$blush: #F4E3DC;     // 裸粉：选中底色、标签底色
+$blush-ink: #8A5F55; // 裸粉上的文字
+$sage: #8FA487;      // 鼠尾草：只用于安全感信息和“已确认”
+$sage-bg: #EAF0E6;
+$sage-ink: #55664F;
+$ink: #3F3330;       // 正文
+$mute: #9A8A84;      // 次要文字
+$hair: #EFE3DD;      // 分割线、细边框
+$disabled: #CDBDB5;
+
+// 字体
+$font-serif: "Noto Serif SC", "Songti SC", "STSong", serif;
+$font-sans: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+
+// 字号
+$fs-title: 44rpx;    // 页面大标题
+$fs-h2: 36rpx;       // 区块标题
+$fs-body: 28rpx;
+$fs-small: 26rpx;
+$fs-caption: 22rpx;
+
+// 圆角
+$r-card: 36rpx;
+$r-inner: 28rpx;
+$r-small: 24rpx;
+$r-pill: 999rpx;
+$r-arch: 999rpx 999rpx 40rpx 40rpx; // 拱形
+
+// 间距
+$page-x: 40rpx;      // 页面左右边距
+$gap: 24rpx;
+
+// 阴影
+$shadow-card: 0 12rpx 36rpx -24rpx rgba(110, 84, 70, 0.35);
+
+// 占位渐变（对应原型 g1–g6），ArchImage 组件使用
+$placeholders: (
+  g1: (radial-gradient(60% 45% at 50% 38%, #F7D9CF 0 55%, transparent 56%), radial-gradient(90% 70% at 50% 100%, #B78473, #8C6152)),
+  g2: (radial-gradient(55% 42% at 50% 40%, #F3D6CB 0 55%, transparent 56%), linear-gradient(#E5BDB2, #C6958A)),
+  g3: (radial-gradient(55% 42% at 50% 40%, #F6E0D6 0 55%, transparent 56%), linear-gradient(#D9C7B6, #A99279)),
+  g4: (radial-gradient(55% 42% at 50% 40%, #F4DAD0 0 55%, transparent 56%), linear-gradient(#EBD3CB, #D0A9A0)),
+  g5: (radial-gradient(55% 42% at 50% 40%, #F2D5CA 0 55%, transparent 56%), linear-gradient(#C7B3B0, #8E7572)),
+  g6: (radial-gradient(55% 40% at 50% 40%, #F5DCD2 0 55%, transparent 56%), linear-gradient(#E9CFC0, #B99A86)),
+);
+
+@mixin arch { border-radius: $r-arch; overflow: hidden; }
+@mixin safe-bottom($base: 0rpx) { padding-bottom: calc(#{$base} + env(safe-area-inset-bottom)); }

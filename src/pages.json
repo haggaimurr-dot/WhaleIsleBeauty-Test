@@ -1,0 +1,39 @@
+{
+	// 第一项是启动页。所有页面 disableScroll，由 PageLayout 负责内容滚动（头尾固定、无滚动条）。页面清单见 CLAUDE.md；颜色值对应 styles/tokens.scss（JSON 里不能引用 SCSS 变量）
+	"pages": [
+		{ "path": "pages/home/index", "style": { "disableScroll": true, "navigationBarTitleText": "" } },
+		{ "path": "pages/works/index", "style": { "disableScroll": true, "navigationBarTitleText": "" } },
+		{ "path": "pages/service/detail", "style": { "disableScroll": true, "navigationStyle": "custom" } },
+		{ "path": "pages/booking/index", "style": { "disableScroll": true, "navigationBarTitleText": "预约" } },
+		{ "path": "pages/booking/success", "style": { "disableScroll": true, "navigationBarTitleText": "" } },
+		{ "path": "pages/booking/reschedule", "style": { "disableScroll": true, "navigationBarTitleText": "改期" } },
+		{ "path": "pages/me/index", "style": { "disableScroll": true, "navigationBarTitleText": "" } }
+	],
+	"subPackages": [
+		{
+			"root": "pages-owner",
+			"pages": [
+				{ "path": "schedule/index", "style": { "disableScroll": true, "navigationBarTitleText": "工作台" } }
+			]
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "鲸屿",
+		"navigationBarBackgroundColor": "#FBF4F0",
+		"backgroundColor": "#FBF4F0",
+		"backgroundTextStyle": "dark"
+	},
+	"tabBar": {
+		"color": "#9A8A84",
+		"selectedColor": "#6E5446",
+		"backgroundColor": "#FFFFFF",
+		"borderStyle": "white",
+		"list": [
+			{ "pagePath": "pages/home/index", "text": "首页", "iconPath": "static/tab/home.png", "selectedIconPath": "static/tab/home-on.png" },
+			{ "pagePath": "pages/works/index", "text": "作品", "iconPath": "static/tab/works.png", "selectedIconPath": "static/tab/works-on.png" },
+			{ "pagePath": "pages/booking/index", "text": "预约", "iconPath": "static/tab/booking.png", "selectedIconPath": "static/tab/booking-on.png" },
+			{ "pagePath": "pages/me/index", "text": "我的", "iconPath": "static/tab/me.png", "selectedIconPath": "static/tab/me-on.png" }
+		]
+	}
+}

@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>鲸屿美妆小程序 高保真原型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --page:#EFE6E1; --page-ink:#4A3B36; --page-mute:#8F7F79; --panel:#F8F1ED; --line:#E2D4CD;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--page:#231C1A;--page-ink:#EFE3DD;--page-mute:#A8958E;--panel:#2E2522;--line:#43372F;}
+}
+:root[data-theme="dark"]{--page:#231C1A;--page-ink:#EFE3DD;--page-mute:#A8958E;--panel:#2E2522;--line:#43372F;}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+*,*::before,*::after{box-sizing:inherit;}
+body{margin:0;background:var(--page);color:var(--page-ink);
+  font-family:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased;}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0;}
+button:focus-visible,textarea:focus-visible{outline:2px solid #C98F86;outline-offset:2px;}
+
+/* stage */
+.stage{display:flex;gap:48px;justify-content:center;align-items:flex-start;padding:40px 24px 56px;max-width:1120px;margin:0 auto;}
+.notes{flex:1;max-width:400px;padding-top:12px;}
+.notes h1{font-family:"Noto Serif SC",serif;font-weight:600;font-size:28px;line-height:1.35;margin:0 0 10px;}
+.notes p{color:var(--page-mute);font-size:14px;line-height:1.8;margin:0 0 20px;}
+.notes h2{font-size:14px;font-weight:600;margin:28px 0 12px;}
+.jump{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.jump small{grid-column:1/-1;font-size:12px;color:var(--page-mute);margin:8px 0 2px;}
+.jump small:first-child{margin-top:0;}
+.jump button{text-align:left;padding:10px 14px;border-radius:12px;font-size:14px;border:1px solid var(--line);background:var(--panel);}
+.jump button[aria-current="true"]{border-color:#B98A80;box-shadow:inset 3px 0 0 #B98A80;}
+.swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.sw{font-size:12px;color:var(--page-mute);line-height:1.5;}
+.sw i{display:block;height:40px;border-radius:10px;margin-bottom:6px;border:1px solid var(--line);}
+.spec{font-size:13px;line-height:1.9;color:var(--page-mute);margin:0;padding-left:18px;}
+
+/* phone */
+.phone{--milk:#FBF4F0;--card:#FFFFFF;--mocha:#6E5446;--rose:#D4A39B;--blush:#F4E3DC;--sage:#8FA487;--sage-bg:#EAF0E6;--sage-ink:#55664F;--ink:#3F3330;--mute:#9A8A84;--hair:#EFE3DD;
+  width:375px;height:780px;flex:none;border-radius:44px;background:#1E1816;padding:10px;box-shadow:0 30px 60px -20px rgba(70,45,35,.35);position:sticky;top:24px;}
+.screen{position:relative;height:100%;border-radius:36px;overflow:hidden;background:var(--milk);color:var(--ink);}
+.status{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 26px 0 30px;font-size:14px;font-weight:600;position:relative;z-index:5;}
+.capsule{position:absolute;right:12px;top:50px;z-index:6;width:87px;height:32px;border-radius:16px;border:1px solid rgba(63,51,48,.12);background:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:space-around;}
+.capsule span{width:18px;height:2px;border-radius:2px;position:relative;}
+.capsule span:first-child::before{content:"";position:absolute;inset:-1px 0;background:radial-gradient(circle,var(--ink) 1.6px,transparent 2px) 0 50%/6px 4px repeat-x;}
+.capsule span:last-child{width:16px;height:16px;border:2px solid var(--ink);border-radius:50%;}
+.navbar{height:44px;display:flex;align-items:center;padding:0 16px;gap:8px;font-size:16px;font-weight:600;flex:none;}
+.back{width:32px;height:32px;display:grid;place-items:center;border-radius:50%;}
+.view{position:absolute;inset:0;display:flex;flex-direction:column;}
+.view[hidden]{display:none;}
+.top{height:44px;flex:none;}
+.scroll{flex:1;overflow-y:auto;scrollbar-width:none;}
+.scroll::-webkit-scrollbar{display:none;}
+.arch{border-radius:999px 999px 20px 20px;overflow:hidden;position:relative;}
+.ph{position:absolute;inset:0;}
+.ph em{position:absolute;left:0;right:0;bottom:10px;text-align:center;font-style:normal;font-size:11px;color:rgba(255,255,255,.92);}
+.g1{background:radial-gradient(60% 45% at 50% 38%,#F7D9CF 0 55%,transparent 56%),radial-gradient(90% 70% at 50% 100%,#B78473,#8C6152);}
+.g2{background:radial-gradient(55% 42% at 50% 40%,#F3D6CB 0 55%,transparent 56%),linear-gradient(#E5BDB2,#C6958A);}
+.g3{background:radial-gradient(55% 42% at 50% 40%,#F6E0D6 0 55%,transparent 56%),linear-gradient(#D9C7B6,#A99279);}
+.g4{background:radial-gradient(55% 42% at 50% 40%,#F4DAD0 0 55%,transparent 56%),linear-gradient(#EBD3CB,#D0A9A0);}
+.g5{background:radial-gradient(55% 42% at 50% 40%,#F2D5CA 0 55%,transparent 56%),linear-gradient(#C7B3B0,#8E7572);}
+.g6{background:radial-gradient(55% 40% at 50% 40%,#F5DCD2 0 55%,transparent 56%),linear-gradient(#E9CFC0,#B99A86);}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 22px;border-radius:22px;background:var(--mocha);color:#FFF8F4;font-size:15px;font-weight:500;}
+.btn.ghost{background:var(--card);color:var(--mocha);box-shadow:inset 0 0 0 1px var(--hair);}
+.btn.sm{height:32px;padding:0 14px;font-size:13px;border-radius:16px;}
+.btn[disabled]{background:#CDBDB5;cursor:not-allowed;}
+.sec{margin:28px 20px 12px;display:flex;justify-content:space-between;align-items:baseline;}
+.sec h3{margin:0;font-family:"Noto Serif SC",serif;font-weight:600;font-size:18px;}
+.sec button{font-size:12px;color:var(--mute);}
+.price{font-family:"Noto Serif SC",serif;font-weight:600;color:var(--mocha);font-size:17px;}
+.price small{font-family:"Noto Sans SC",sans-serif;font-size:12px;font-weight:400;color:var(--mute);margin-left:4px;}
+.chips{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{padding:7px 14px;border-radius:999px;background:var(--card);font-size:13px;flex:none;}
+.chip[aria-pressed="true"]{background:var(--blush);color:var(--mocha);box-shadow:inset 0 0 0 1px var(--rose);}
+.tabbar{height:62px;flex:none;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(255,255,255,.94);border-top:1px solid var(--hair);padding-bottom:6px;}
+.tabbar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;color:var(--mute);}
+.tabbar button.on{color:var(--mocha);font-weight:600;}
+.bar{flex:none;padding:10px 16px 18px;background:rgba(255,255,255,.96);border-top:1px solid var(--hair);display:flex;align-items:center;gap:12px;}
+.bar .sum{flex:1;font-size:12px;color:var(--mute);line-height:1.5;}
+.bar .sum b{display:block;font-size:14px;color:var(--ink);font-weight:600;}
+.badge{font-size:11px;padding:3px 8px;border-radius:999px;font-weight:500;white-space:nowrap;}
+.badge.wait{background:var(--blush);color:#9A5F55;}
+.badge.ok{background:var(--sage-bg);color:var(--sage-ink);}
+.badge.past{background:#F2ECE9;color:var(--mute);}
+
+/* home */
+.brand{padding:4px 20px 0;display:flex;align-items:baseline;gap:10px;}
+.brand b{font-family:"Noto Serif SC",serif;font-weight:700;font-size:22px;letter-spacing:.08em;color:var(--mocha);}
+.brand small{font-size:12px;color:var(--mute);}
+.hero{margin:16px 20px 0;display:grid;grid-template-columns:1fr 120px;gap:14px;align-items:end;}
+.hero h2{font-family:"Noto Serif SC",serif;font-weight:600;font-size:22px;line-height:1.45;margin:0 0 10px;}
+.hero p{margin:0 0 16px;font-size:13px;line-height:1.7;color:var(--mute);}
+.hero .arch{height:168px;box-shadow:0 0 0 6px var(--card),0 0 0 7px var(--hair);margin:8px 8px 8px 0;}
+.trust{margin:22px 20px 0;padding:14px 16px;border-radius:16px;background:var(--sage-bg);display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.trust div{font-size:12px;line-height:1.5;color:var(--sage-ink);text-align:center;}
+.trust svg{display:block;margin:0 auto 4px;}
+.styles{display:flex;gap:12px;overflow-x:auto;padding:0 20px 4px;scrollbar-width:none;}
+.styles::-webkit-scrollbar{display:none;}
+.style{flex:none;width:96px;text-align:center;font-size:13px;}
+.style .arch{height:124px;margin-bottom:8px;}
+.style span{color:var(--mute);font-size:11px;display:block;margin-top:2px;}
+.svc{margin:0 20px 12px;padding:12px;border-radius:18px;background:var(--card);display:flex;gap:12px;align-items:center;text-align:left;width:calc(100% - 40px);box-shadow:0 6px 18px -12px rgba(110,84,70,.35);}
+.svc .thumb{width:72px;height:72px;border-radius:14px;position:relative;overflow:hidden;flex:none;}
+.svc h4{margin:0 0 4px;font-size:15px;font-weight:600;}
+.svc p{margin:0 0 6px;font-size:12px;color:var(--mute);}
+
+/* detail */
+.dhero{height:300px;position:relative;margin-top:-88px;}
+.dhero .ph{border-radius:0 0 50% 50% / 0 0 36px 36px;}
+.dbody{padding:20px;}
+.dbody h2{font-family:"Noto Serif SC",serif;font-weight:600;font-size:22px;margin:0 0 6px;}
+.meta{font-size:13px;color:var(--mute);margin:0 0 14px;}
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;}
+.tag{font-size:12px;padding:5px 10px;border-radius:999px;background:var(--blush);color:#8A5F55;}
+.box{background:var(--card);border-radius:18px;padding:16px;margin-bottom:12px;}
+.box h4{margin:0 0 10px;font-size:14px;font-weight:600;}
+.box ul{margin:0;padding-left:18px;font-size:13px;line-height:1.9;color:#6D5E59;}
+.box p{margin:0;font-size:13px;line-height:1.8;color:#6D5E59;}
+
+/* booking */
+.bk{padding:4px 20px 20px;}
+.bk h3{font-size:15px;font-weight:600;margin:22px 0 12px;}
+.chosen{display:flex;gap:12px;align-items:center;background:var(--card);border-radius:16px;padding:10px;}
+.chosen .thumb{width:48px;height:48px;border-radius:12px;position:relative;overflow:hidden;flex:none;}
+.chosen div{font-size:13px;color:var(--mute);}
+.chosen b{display:block;font-size:14px;color:var(--ink);font-weight:600;}
+.artists{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.artist{background:var(--card);border-radius:18px;padding:12px 8px;text-align:center;font-size:13px;transition:box-shadow .2s;}
+.artist .arch{width:56px;height:68px;margin:0 auto 8px;}
+.artist span{display:block;font-size:11px;color:var(--mute);margin-top:2px;line-height:1.4;}
+.artist[aria-pressed="true"]{box-shadow:inset 0 0 0 1.5px var(--mocha);}
+.days{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -20px;padding:0 20px;}
+.days::-webkit-scrollbar{display:none;}
+.day{flex:none;width:52px;height:64px;border-radius:16px;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:var(--mute);gap:2px;}
+.day b{font-size:17px;color:var(--ink);font-weight:600;}
+.day[aria-pressed="true"]{background:var(--mocha);color:#EBD9D0;}
+.day[aria-pressed="true"] b{color:#FFF8F4;}
+.slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.slot{height:40px;border-radius:12px;background:var(--card);font-size:14px;font-variant-numeric:tabular-nums;}
+.slot[disabled]{background:transparent;color:#C9BBB5;text-decoration:line-through;box-shadow:inset 0 0 0 1px var(--hair);cursor:not-allowed;}
+.slot[aria-pressed="true"]{background:var(--blush);color:var(--mocha);font-weight:600;box-shadow:inset 0 0 0 1.5px var(--rose);}
+.hint{font-size:12px;color:var(--mute);margin:8px 0 0;}
+textarea{width:100%;min-height:72px;border:0;border-radius:14px;background:var(--card);padding:12px;font:inherit;font-size:13px;color:var(--ink);resize:none;}
+textarea::placeholder{color:#B9AAA4;}
+.policy{margin-top:16px;padding:12px 14px;border-radius:14px;background:var(--sage-bg);font-size:12px;line-height:1.7;color:var(--sage-ink);}
+
+/* success */
+.done{flex:1;display:flex;flex-direction:column;align-items:center;padding:24px 24px 0;text-align:center;}
+.done .arch{width:120px;height:148px;margin:12px 0 22px;background:var(--blush);display:grid;place-items:center;}
+.done h2{font-family:"Noto Serif SC",serif;font-weight:600;font-size:24px;margin:0 0 8px;}
+.done > p{font-size:13px;color:var(--mute);margin:0 0 22px;line-height:1.7;}
+.ticket{width:100%;background:var(--card);border-radius:20px;padding:6px 18px;text-align:left;}
+.ticket div{display:flex;justify-content:space-between;gap:12px;padding:12px 0;font-size:14px;border-bottom:1px dashed var(--hair);}
+.ticket div:last-child{border:0;}
+.ticket span{color:var(--mute);flex:none;}
+.done .actions{display:flex;flex-direction:column;gap:10px;width:100%;margin-top:22px;}
+.draw{stroke-dasharray:60;stroke-dashoffset:60;}
+.show .draw{animation:draw .7s .15s ease-out forwards;}
+@keyframes draw{to{stroke-dashoffset:0;}}
+
+/* works */
+.ptitle{padding:0 20px;font-family:"Noto Serif SC",serif;font-weight:600;font-size:22px;margin:4px 0 4px;}
+.psub{padding:0 20px;font-size:12px;color:var(--mute);margin:0 0 14px;}
+.filter{display:flex;gap:8px;overflow-x:auto;padding:0 20px 14px;scrollbar-width:none;}
+.filter::-webkit-scrollbar{display:none;}
+.works{columns:2;column-gap:12px;padding:0 16px 16px;}
+.work{display:block;width:100%;break-inside:avoid;margin-bottom:16px;text-align:left;}
+.work .arch{margin-bottom:8px;}
+.work b{display:block;font-size:13px;font-weight:600;}
+.work span{font-size:11px;color:var(--mute);}
+.sheet-bg{position:absolute;inset:0;background:rgba(63,51,48,.35);z-index:30;opacity:0;pointer-events:none;transition:opacity .25s;}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:31;background:var(--milk);border-radius:28px 28px 0 0;padding:14px 20px 22px;transform:translateY(105%);transition:transform .3s cubic-bezier(.2,.8,.2,1);}
+.sheet.on{transform:none;}
+.sheet-bg.on{opacity:1;pointer-events:auto;}
+.grip{width:36px;height:4px;border-radius:2px;background:#E2D2CA;margin:0 auto 14px;}
+.sheet .arch{height:260px;width:200px;margin:0 auto 16px;}
+.sheet h3{font-family:"Noto Serif SC",serif;font-weight:600;font-size:19px;margin:0 0 4px;text-align:center;}
+.sheet p{text-align:center;font-size:13px;color:var(--mute);margin:0 0 18px;line-height:1.7;}
+.sheet .row{display:flex;gap:10px;}
+.sheet .row .btn{flex:1;}
+
+/* me */
+.mehead{display:flex;align-items:center;gap:14px;padding:4px 20px 0;}
+.mehead .arch{width:56px;height:66px;flex:none;}
+.mehead b{display:block;font-size:18px;font-weight:600;font-family:"Noto Serif SC",serif;}
+.mehead span{font-size:12px;color:var(--mute);}
+.seg{margin:22px 20px 14px;display:grid;grid-template-columns:1fr 1fr;background:#F3E9E4;border-radius:14px;padding:4px;}
+.seg button{height:34px;border-radius:10px;font-size:14px;color:var(--mute);}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 2px 6px -3px rgba(110,84,70,.3);}
+.bcard{margin:0 20px 12px;background:var(--card);border-radius:20px;padding:16px;}
+.bcard .h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px;}
+.bcard .when{font-family:"Noto Serif SC",serif;font-weight:600;font-size:18px;line-height:1.3;}
+.bcard .when small{display:block;font-family:"Noto Sans SC",sans-serif;font-size:12px;color:var(--mute);font-weight:400;margin-top:4px;}
+.bcard .info{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px dashed var(--hair);border-bottom:1px dashed var(--hair);}
+.bcard .info .arch{width:40px;height:48px;flex:none;}
+.bcard .info div{font-size:13px;color:var(--mute);line-height:1.6;}
+.bcard .info b{color:var(--ink);font-weight:600;}
+.bcard .note{font-size:12px;color:var(--sage-ink);margin:12px 0;line-height:1.6;}
+.bcard .acts{display:flex;gap:8px;justify-content:flex-end;}
+.past{display:flex;gap:12px;align-items:center;margin:0 20px 10px;background:var(--card);border-radius:18px;padding:12px;}
+.past .thumb{width:56px;height:56px;border-radius:12px;position:relative;overflow:hidden;flex:none;}
+.past div{flex:1;font-size:12px;color:var(--mute);line-height:1.6;}
+.past b{display:block;font-size:14px;color:var(--ink);font-weight:600;}
+.empty{text-align:center;margin:10px 20px;padding:32px 20px;background:var(--card);border-radius:20px;}
+.empty p{font-size:13px;color:var(--mute);margin:0 0 16px;line-height:1.7;}
+.menu{margin:18px 20px 20px;background:var(--card);border-radius:18px;overflow:hidden;}
+.menu button{width:100%;display:flex;justify-content:space-between;align-items:center;padding:15px 16px;font-size:14px;border-bottom:1px solid var(--hair);text-align:left;}
+.menu button:last-child{border:0;}
+.menu button span{font-size:12px;color:var(--mute);}
+
+/* owner */
+.owner{--o-bg:#F6F1EE;}
+.ohead{padding:0 20px;display:flex;justify-content:space-between;align-items:flex-end;}
+.ohead h2{margin:0;font-family:"Noto Serif SC",serif;font-weight:600;font-size:22px;}
+.ohead span{font-size:12px;color:var(--mute);}
+.ostats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 20px 0;}
+.ostats div{background:var(--card);border-radius:14px;padding:10px 12px;font-size:11px;color:var(--mute);}
+.ostats b{display:block;font-size:20px;color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums;}
+.pending{margin:14px 20px 0;border-radius:18px;background:var(--blush);padding:14px;display:flex;gap:12px;align-items:center;}
+.pending div{flex:1;font-size:12px;color:#8A5F55;line-height:1.6;}
+.pending b{display:block;font-size:14px;color:var(--ink);font-weight:600;}
+.og-wrap{margin:14px 12px 0;}
+.og{display:grid;grid-template-columns:38px repeat(3,1fr);gap:5px;}
+.og .hd{font-size:12px;font-weight:600;text-align:center;padding:4px 0 6px;}
+.og .tm{font-size:11px;color:var(--mute);font-variant-numeric:tabular-nums;padding-top:6px;}
+.cell{min-height:50px;border-radius:10px;font-size:11px;line-height:1.35;padding:6px 6px;text-align:left;display:flex;flex-direction:column;justify-content:center;}
+.cell.free{box-shadow:inset 0 0 0 1px #E6D8D1;color:#BFAFA8;align-items:center;}
+.cell.bk{background:#EDE2DC;color:var(--ink);}
+.cell.bk i{font-style:normal;color:var(--mute);font-size:10px;}
+.cell.bk .al{color:#B06A5E;}
+.cell.off{background:repeating-linear-gradient(135deg,#F1EAE6 0 6px,#E9E0DB 6px 7px);color:var(--mute);align-items:center;}
+.cell.new{background:var(--card);box-shadow:inset 0 0 0 1.5px var(--rose);color:var(--ink);}
+.cell.new i{font-style:normal;color:#B06A5E;font-size:10px;}
+.cell.mine-ok{background:var(--sage-bg);color:var(--ink);}
+.cell.mine-ok i{font-style:normal;color:var(--sage-ink);font-size:10px;}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin:12px 20px 18px;font-size:11px;color:var(--mute);}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px;}
+
+.toast{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);background:rgba(63,51,48,.88);color:#fff;font-size:13px;padding:10px 16px;border-radius:12px;z-index:50;opacity:0;pointer-events:none;transition:opacity .2s;max-width:80%;text-align:center;line-height:1.6;}
+.toast.on{opacity:1;}
+@media (prefers-reduced-motion:reduce){.show .draw{animation:none;stroke-dashoffset:0;}*{transition:none!important;}}
+@media (max-width:860px){
+  .stage{flex-direction:column;align-items:center;padding:20px 12px 40px;gap:24px;}
+  .notes{max-width:420px;width:100%;padding:0 8px;}
+  .notes .extra{display:none;}
+  .phone{position:relative;top:0;}
+}
+@media (max-width:420px){
+  .phone{width:100%;height:760px;padding:0;border-radius:28px;background:none;box-shadow:0 20px 40px -20px rgba(70,45,35,.3);}
+  .screen{border-radius:28px;}
+}
+</style>
+</head>
+<body>
+<div class="stage">
+  <aside class="notes">
+    <h1>鲸屿美妆小程序<br>高保真原型</h1>
+    <p>整套页面可以直接点击，数据是连通的：你在客人端约的时段，会以“待确认”出现在店主排班里；店主确认后，“我的预约”里的状态也会跟着变。</p>
+    <h2>页面</h2>
+    <div class="jump" id="jump">
+      <small>客人端</small>
+      <button data-go="home">首页</button>
+      <button data-go="works">作品</button>
+      <button data-go="detail">项目详情</button>
+      <button data-go="book">预约</button>
+      <button data-go="done">预约成功</button>
+      <button data-go="me">我的预约</button>
+      <small>店主端</small>
+      <button data-go="owner">排班</button>
+    </div>
+    <div class="extra">
+      <h2>颜色</h2>
+      <div class="swatches">
+        <div class="sw"><i style="background:#FBF4F0"></i>奶霜底 #FBF4F0</div>
+        <div class="sw"><i style="background:#6E5446"></i>摩卡 #6E5446</div>
+        <div class="sw"><i style="background:#D4A39B"></i>雾玫瑰 #D4A39B</div>
+        <div class="sw"><i style="background:#F4E3DC"></i>裸粉 #F4E3DC</div>
+        <div class="sw"><i style="background:#8FA487"></i>鼠尾草 #8FA487</div>
+        <div class="sw"><i style="background:#3F3330"></i>正文 #3F3330</div>
+      </div>
+      <h2>开发备注</h2>
+      <ul class="spec">
+        <li>设计宽度 375px，换算成 750rpx 时数值乘以 2</li>
+        <li>鼠尾草绿只用于“安全感”信息和“已确认”状态</li>
+        <li>店主端和客人端是同一个小程序，按 openid 的角色显示入口</li>
+        <li>排班格子的四种状态：空闲、已约、待确认、休息，对应后端 slot 状态枚举</li>
+        <li>作品图目前是占位，正式版替换为门店的真实作品</li>
+      </ul>
+    </div>
+  </aside>
+
+  <div class="phone">
+    <div class="screen" id="screen">
+      <div class="status"><span>10:59</span><span>
+        <svg width="54" height="12" viewBox="0 0 54 12" fill="#3F3330" aria-hidden="true"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2" width="3" height="10" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/><rect x="26" y="1" width="23" height="10" rx="3" fill="none" stroke="#3F3330"/><rect x="28" y="3" width="16" height="6" rx="1.5"/><rect x="50" y="4" width="2" height="4" rx="1"/></svg></span></div>
+      <div class="capsule" aria-hidden="true"><span></span><span></span></div>
+      <div class="toast" id="toast"></div>
+
+      <!-- HOME -->
+      <section class="view" data-view="home">
+        <div class="top"></div><div class="navbar"></div>
+        <div class="scroll">
+          <div class="brand"><b>鲸屿</b><small>美妆 · 私人定制</small></div>
+          <div class="hero">
+            <div>
+              <h2>为重要的那天，<br>认真画一次妆</h2>
+              <p>一对一，一客一消毒。<br>约会、上镜、新娘，都可以慢慢聊。</p>
+              <button class="btn" data-go="book">预约化妆</button>
+            </div>
+            <div class="arch"><div class="ph g1"><em>作品图</em></div></div>
+          </div>
+          <div class="trust">
+            <div><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6F8768" stroke-width="1.6" stroke-linecap="round"><path d="M12 3l7 3v6c0 4.2-3 7.4-7 9-4-1.6-7-4.8-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>工具一客一消毒</div>
+            <div><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6F8768" stroke-width="1.6" stroke-linecap="round"><rect x="8" y="3" width="8" height="18" rx="2"/><path d="M8 8h8"/></svg>用品品牌公开</div>
+            <div><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6F8768" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M9.5 9.5h4a1.5 1.5 0 010 3h-3a1.5 1.5 0 000 3h4M12 8v1.5M12 15.5V17"/></svg>到店不加价</div>
+          </div>
+          <div class="sec"><h3>按场合选妆</h3><button data-go="works">全部作品</button></div>
+          <div class="styles">
+            <button class="style" data-go="works" data-f="上镜"><div class="arch"><div class="ph g2"></div></div>上镜妆<span>拍照不假面</span></button>
+            <button class="style" data-go="works" data-f="约会"><div class="arch"><div class="ph g4"></div></div>约会妆<span>近看也干净</span></button>
+            <button class="style" data-go="works" data-f="新娘"><div class="arch"><div class="ph g3"></div></div>新娘妆<span>持妆一整天</span></button>
+            <button class="style" data-go="works" data-f="主持"><div class="arch"><div class="ph g5"></div></div>主持妆<span>舞台灯光下</span></button>
+          </div>
+          <div class="sec"><h3>服务项目</h3></div>
+          <button class="svc" data-go="detail"><div class="thumb"><div class="ph g2"></div></div><div><h4>韩式上镜妆（含发型）</h4><p>约 90 分钟 · 适合拍照、证件照</p><span class="price">¥298</span></div></button>
+          <button class="svc" data-go="detail"><div class="thumb"><div class="ph g4"></div></div><div><h4>日常约会妆</h4><p>约 60 分钟 · 可教你日常怎么画</p><span class="price">¥168</span></div></button>
+          <button class="svc" data-go="detail"><div class="thumb"><div class="ph g3"></div></div><div><h4>新娘跟妆</h4><p>需提前沟通 · 含试妆一次</p><span class="price">¥1280<small>起</small></span></div></button>
+          <div style="height:16px"></div>
+        </div>
+        <nav class="tabbar" data-tab="home"></nav>
+      </section>
+
+      <!-- WORKS -->
+      <section class="view" data-view="works" hidden>
+        <div class="top"></div><div class="navbar"></div>
+        <div class="scroll">
+          <h2 class="ptitle">作品</h2>
+          <p class="psub">都是来过的客人，经本人同意后展示</p>
+          <div class="filter" id="filter"></div>
+          <div class="works" id="works"></div>
+        </div>
+        <nav class="tabbar" data-tab="works"></nav>
+      </section>
+
+      <!-- DETAIL -->
+      <section class="view" data-view="detail" hidden>
+        <div class="top"></div>
+        <div class="navbar" style="position:relative;z-index:4"><button class="back" data-go="home" aria-label="返回" style="background:rgba(255,255,255,.75)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3F3330" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></button></div>
+        <div class="scroll">
+          <div class="dhero"><div class="ph g2"><em>作品图 1 / 6</em></div></div>
+          <div class="dbody">
+            <h2>韩式上镜妆（含发型）</h2>
+            <p class="meta">约 90 分钟　已有 128 位客人选择</p>
+            <div class="tags"><span class="tag">拍照不假面</span><span class="tag">氧气感底妆</span><span class="tag">含简单盘发</span></div>
+            <div class="box"><h4>包含</h4><ul><li>妆前护肤和底妆</li><li>眼妆、修容、唇妆</li><li>简单盘发或卷发</li><li>假睫毛可选，不另收费</li></ul></div>
+            <div class="box"><h4>使用的产品</h4><p>底妆和彩妆均为正品专柜品牌，到店时可以查看。如果你有常用的产品，也可以自己带来。</p></div>
+            <div class="box"><h4>来之前</h4><p>素颜到店即可。有过敏史的话，预约时告诉我们，化妆师会提前准备替代产品。</p></div>
+          </div>
+        </div>
+        <div class="bar"><div class="sum"><b><span class="price">¥298</span></b>定金 ¥50，到店付尾款</div><button class="btn" data-go="book">预约这个妆</button></div>
+      </section>
+
+      <!-- BOOK -->
+      <section class="view" data-view="book" hidden>
+        <div class="top"></div>
+        <div class="navbar"><button class="back" data-go="home" aria-label="返回"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3F3330" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></button><span id="bookTitle">预约</span></div>
+        <div class="scroll">
+          <div class="bk">
+            <div class="chosen"><div class="thumb"><div class="ph g2"></div></div><div><b>韩式上镜妆（含发型）</b>约 90 分钟　¥298</div></div>
+            <h3>化妆师</h3>
+            <div class="artists" id="artists"></div>
+            <h3>日期</h3>
+            <div class="days" id="days"></div>
+            <h3>时间</h3>
+            <div class="slots" id="slots"></div>
+            <p class="hint">划线的时段已经约满</p>
+            <h3>这次是为了</h3>
+            <div class="chips"><button class="chip">拍照</button><button class="chip">约会</button><button class="chip">面试</button><button class="chip">活动/主持</button><button class="chip">其他</button></div>
+            <h3>你的肤质</h3>
+            <div class="chips"><button class="chip">干皮</button><button class="chip">油皮</button><button class="chip">混合</button><button class="chip">敏感</button><button class="chip">不确定</button></div>
+            <h3>还想告诉化妆师的</h3>
+            <textarea placeholder="比如过敏的成分、喜欢的风格，或者带一张参考图来"></textarea>
+            <div class="policy">预约时间前 24 小时可免费改期或取消，定金原路退回。你的照片只在你同意后才会用作作品展示。</div>
+          </div>
+        </div>
+        <div class="bar"><div class="sum" id="sum"></div><button class="btn" id="pay" disabled>付定金并预约</button></div>
+      </section>
+
+      <!-- DONE -->
+      <section class="view" data-view="done" hidden>
+        <div style="height:88px;flex:none"></div>
+        <div class="done">
+          <div class="arch"><svg width="56" height="56" viewBox="0 0 56 56" fill="none"><circle cx="28" cy="28" r="26" fill="#FFF8F4"/><path class="draw" d="M17 29l7 7 15-16" stroke="#6E5446" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <h2>预约好了</h2>
+          <p>店里确认后会通知你，前一天也会提醒你。<br>到时候素颜过来就好。</p>
+          <div class="ticket" id="ticket"></div>
+          <div class="actions">
+            <button class="btn" data-go="me">查看我的预约</button>
+            <button class="btn ghost" data-go="home">回到首页</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ME -->
+      <section class="view" data-view="me" hidden>
+        <div class="top"></div><div class="navbar"></div>
+        <div class="scroll">
+          <div class="mehead"><div class="arch"><div class="ph g4"></div></div><div><b>阿柚</b><span>这是你第 4 次来鲸屿</span></div></div>
+          <div class="seg"><button data-seg="up" aria-pressed="true">即将到来</button><button data-seg="past" aria-pressed="false">已完成</button></div>
+          <div id="meList"></div>
+          <div class="menu">
+            <button onclick="toast('肤质档案：二期功能')">我的肤质档案<span>敏感肌 · 冷白皮</span></button>
+            <button onclick="toast('拨打门店电话')">联系门店<span>09:00–21:00</span></button>
+            <button data-go="owner">店主工作台<span>仅店主可见</span></button>
+          </div>
+        </div>
+        <nav class="tabbar" data-tab="me"></nav>
+      </section>
+
+      <!-- OWNER -->
+      <section class="view owner" data-view="owner" hidden>
+        <div class="top"></div>
+        <div class="navbar"><button class="back" data-go="me" aria-label="返回"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3F3330" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></button>工作台</div>
+        <div class="scroll">
+          <div class="ohead"><h2>排班</h2><span id="oDate"></span></div>
+          <div class="ostats" id="ostats"></div>
+          <div id="pendingBox"></div>
+          <div class="bk" style="padding-bottom:0"><h3 style="margin-top:18px">日期</h3><div class="days" id="odays"></div></div>
+          <div class="og-wrap"><div class="og" id="og"></div></div>
+          <div class="legend">
+            <span><i style="background:#EDE2DC"></i>已约</span>
+            <span><i style="background:#fff;box-shadow:inset 0 0 0 1.5px #D4A39B"></i>待确认</span>
+            <span><i style="box-shadow:inset 0 0 0 1px #E6D8D1"></i>空闲，点一下设为休息</span>
+            <span><i style="background:repeating-linear-gradient(135deg,#F1EAE6 0 3px,#E0D5CF 3px 4px)"></i>休息</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="sheet-bg" id="sheetBg"></div>
+      <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="作品详情"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const artists=[{n:'小鲸',d:'主理人 8 年',g:'g1'},{n:'安安',d:'6 年 擅长新娘',g:'g4'},{n:'七七',d:'4 年 擅长日常',g:'g3'}];
+const wk=['日','一','二','三','四','五','六'];
+const base=new Date(2026,8,29);
+const days=[...Array(7)].map((_,i)=>{const d=new Date(base);d.setDate(base.getDate()+i);return d;});
+const times=['09:00','10:30','12:00','13:30','15:00','16:30','18:00','19:30'];
+const names=['林小姐','陈小姐','周小姐','许小姐','黄小姐','吴小姐','郑小姐','何小姐'];
+const svcs=['上镜妆','约会妆','新娘试妆','主持妆','面试妆'];
+const works=[
+ {n:'氧气上镜妆',c:'上镜',a:0,g:'g2',h:180,t:'约 90 分钟'},
+ {n:'清透约会妆',c:'约会',a:2,g:'g4',h:220,t:'约 60 分钟'},
+ {n:'中式新娘妆',c:'新娘',a:1,g:'g3',h:230,t:'需提前沟通'},
+ {n:'年会主持妆',c:'主持',a:0,g:'g5',h:190,t:'约 90 分钟'},
+ {n:'毕业照妆',c:'上镜',a:2,g:'g6',h:210,t:'约 75 分钟'},
+ {n:'韩式新娘妆',c:'新娘',a:1,g:'g1',h:180,t:'需提前沟通'},
+ {n:'面试淡妆',c:'约会',a:2,g:'g2',h:200,t:'约 45 分钟'},
+ {n:'证件照妆',c:'上镜',a:0,g:'g4',h:170,t:'约 60 分钟'}
+];
+const st={tab:'home',a:1,d:1,t:null,wf:'全部',seg:'up',od:1,mine:null,off:new Set()};
+const $=s=>document.querySelector(s);
+const dlabel=i=>{const d=days[i];return `${d.getMonth()+1}月${d.getDate()}日 周${wk[d.getDay()]}`;};
+const key=(a,d,t)=>`${a}-${d}-${t}`;
+function taken(a,d,t){return ((a*7+d*3+t*5)%7)<2;}
+function isMine(a,d,t){const m=st.mine;return m&&m.a===a&&m.d===d&&m.t===t;}
+function unavailable(a,d,t){return taken(a,d,t)||st.off.has(key(a,d,t))||isMine(a,d,t);}
+
+/* tabbar */
+const tabs=[['home','首页','<path d="M4 11l8-6 8 6v8a1 1 0 01-1 1h-4v-6H9v6H5a1 1 0 01-1-1z"/>'],['works','作品','<path d="M6 20V10a6 6 0 0112 0v10z"/>'],['book','预约','<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>'],['me','我的','<circle cx="12" cy="9" r="4"/><path d="M4.5 20a7.5 7.5 0 0115 0"/>']];
+document.querySelectorAll('.tabbar').forEach(n=>{n.innerHTML=tabs.map(([k,l,p])=>`<button data-go="${k}" class="${k===n.dataset.tab?'on':''}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${p}</svg>${l}</button>`).join('');});
+
+/* booking */
+function renderArtists(){$('#artists').innerHTML=artists.map((x,i)=>`<button class="artist" aria-pressed="${i===st.a}" data-a="${i}"><div class="arch"><div class="ph ${x.g}"></div></div>${x.n}<span>${x.d}</span></button>`).join('');}
+function dayBtns(sel,attr){return days.map((d,i)=>`<button class="day" aria-pressed="${i===sel}" ${attr}="${i}">${i===0?'明天':'周'+wk[d.getDay()]}<b>${d.getDate()}</b></button>`).join('');}
+function renderDays(){$('#days').innerHTML=dayBtns(st.d,'data-d');}
+function renderSlots(){
+  $('#slots').innerHTML=times.map((t,i)=>{const b=unavailable(st.a,st.d,i);return `<button class="slot" ${b?'disabled':''} aria-pressed="${st.t===i}" data-t="${i}">${t}</button>`}).join('');
+  const ok=st.t!==null;$('#pay').disabled=!ok;
+  $('#sum').innerHTML=ok?`<b>${dlabel(st.d)} ${times[st.t]}　${artists[st.a].n}</b>定金 ¥50，到店付尾款`:'<b>还没选时间</b>定金 ¥50，到店付尾款';
+}
+function ticketHTML(m){return `<div><span>项目</span>韩式上镜妆（含发型）</div><div><span>时间</span>${dlabel(m.d)} ${times[m.t]}</div><div><span>化妆师</span>${artists[m.a].n}</div><div><span>地址</span>蓝山CBD 3329</div><div><span>已付定金</span>¥50</div>`;}
+function makeBooking(){
+  if(st.t===null){st.t=times.findIndex((_,i)=>!unavailable(st.a,st.d,i));}
+  st.mine={a:st.a,d:st.d,t:st.t,status:'wait'};st.od=st.d;st.t=null;
+  $('#ticket').innerHTML=ticketHTML(st.mine);renderSlots();
+}
+$('#pay').addEventListener('click',()=>{makeBooking();go('done');});
+
+/* works */
+function renderWorks(){
+  const cats=['全部','上镜','约会','新娘','主持'];
+  $('#filter').innerHTML=cats.map(c=>`<button class="chip" data-wf="${c}" aria-pressed="${c===st.wf}">${c}</button>`).join('');
+  $('#works').innerHTML=works.map((w,i)=>({w,i})).filter(x=>st.wf==='全部'||x.w.c===st.wf).map(({w,i})=>`<button class="work" data-w="${i}"><div class="arch" style="height:${w.h}px"><div class="ph ${w.g}"></div></div><b>${w.n}</b><span>化妆师 ${artists[w.a].n}</span></button>`).join('');
+}
+function openSheet(i){
+  const w=works[i];
+  $('#sheet').innerHTML=`<div class="grip"></div><div class="arch"><div class="ph ${w.g}"><em>作品图</em></div></div><h3>${w.n}</h3><p>化妆师 ${artists[w.a].n}　${w.t}<br>喜欢这个效果，可以直接约同一位化妆师</p><div class="row"><button class="btn ghost" data-close>再看看</button><button class="btn" data-same="${w.a}">预约同款</button></div>`;
+  $('#sheet').classList.add('on');$('#sheetBg').classList.add('on');
+}
+function closeSheet(){$('#sheet').classList.remove('on');$('#sheetBg').classList.remove('on');}
+
+/* me */
+function renderMe(){
+  document.querySelectorAll('[data-seg]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.seg===st.seg));
+  let h='';
+  if(st.seg==='up'){
+    const m=st.mine;
+    if(!m){h=`<div class="empty"><p>还没有要来的预约。<br>挑一个喜欢的妆，约个时间吧。</p><button class="btn" data-go="book">去预约</button></div>`;}
+    else{
+      const ok=m.status==='ok';
+      h=`<div class="bcard"><div class="h"><div class="when">${dlabel(m.d)}<small>${times[m.t]} 开始，约 90 分钟</small></div><span class="badge ${ok?'ok':'wait'}">${ok?'店里已确认':'等待店里确认'}</span></div>
+      <div class="info"><div class="arch"><div class="ph ${artists[m.a].g}"></div></div><div><b>韩式上镜妆（含发型）</b><br>化妆师 ${artists[m.a].n}　已付定金 ¥50</div></div>
+      <p class="note">开始前 24 小时以上可以免费改期或取消，定金原路退回。</p>
+      <div class="acts"><button class="btn sm ghost" data-cancel>取消预约</button><button class="btn sm ghost" data-resched>改期</button><button class="btn sm" onclick="toast('打开地图导航到 蓝山CBD 3329')">到店导航</button></div></div>`;
+    }
+  }else{
+    h=[['中式新娘试妆','8月16日','安安','g3'],['日常约会妆','7月2日','七七','g4'],['韩式上镜妆','5月20日','小鲸','g2']].map(p=>`<div class="past"><div class="thumb"><div class="ph ${p[3]}"></div></div><div><b>${p[0]}</b>${p[1]}　化妆师 ${p[2]}</div><button class="btn sm ghost" data-go="book">再约一次</button></div>`).join('');
+  }
+  $('#meList').innerHTML=h;
+}
+
+/* owner */
+function renderOwner(){
+  const d=st.od;$('#odays').innerHTML=dayBtns(d,'data-od');$('#oDate').textContent=dlabel(d);
+  let booked=0,free=0,wait=0;
+  let g='<div></div>'+artists.map(a=>`<div class="hd">${a.n}</div>`).join('');
+  times.forEach((t,ti)=>{
+    g+=`<div class="tm">${t}</div>`;
+    artists.forEach((a,ai)=>{
+      const k=key(ai,d,ti);
+      if(isMine(ai,d,ti)){
+        if(st.mine.status==='ok'){booked++;g+=`<button class="cell mine-ok" data-cell="${k}">阿柚<i>上镜妆 已确认</i></button>`;}
+        else{wait++;g+=`<button class="cell new" data-cell="${k}">阿柚<i>待确认</i></button>`;}
+      }else if(taken(ai,d,ti)){booked++;const n=names[(ai+d*2+ti)%8],s=svcs[(ai*3+ti+d)%5],al=(ai+ti+d)%5===0;
+        g+=`<button class="cell bk" data-cell="${k}" data-info="${n}　${s}${al?'　敏感肌，备注：对酒精过敏':''}">${n}<i class="${al?'al':''}">${al?'敏感肌':s}</i></button>`;}
+      else if(st.off.has(k)){g+=`<button class="cell off" data-cell="${k}">休息</button>`;}
+      else{free++;g+=`<button class="cell free" data-cell="${k}">可约</button>`;}
+    });
+  });
+  $('#og').innerHTML=g;
+  $('#ostats').innerHTML=`<div><b>${booked+wait}</b>当天预约</div><div><b>${wait}</b>待确认</div><div><b>${free}</b>空闲时段</div>`;
+  const m=st.mine;
+  $('#pendingBox').innerHTML=(m&&m.status==='wait')?`<div class="pending"><div><b>新预约：阿柚</b>${dlabel(m.d)} ${times[m.t]}　${artists[m.a].n}　上镜妆　定金已付</div><button class="btn sm" data-confirm>确认</button></div>`:'';
+}
+
+/* events */
+document.addEventListener('click',e=>{
+  const T=s=>e.target.closest(s);
+  let x;
+  if(x=T('[data-a]')){st.a=+x.dataset.a;st.t=null;renderArtists();renderSlots();return;}
+  if(x=T('[data-d]')){st.d=+x.dataset.d;st.t=null;renderDays();renderSlots();return;}
+  if((x=T('[data-t]'))&&!x.disabled){st.t=+x.dataset.t;renderSlots();return;}
+  if(x=T('[data-wf]')){st.wf=x.dataset.wf;renderWorks();return;}
+  if(x=T('[data-w]')){openSheet(+x.dataset.w);return;}
+  if(T('[data-close]')||T('#sheetBg')){closeSheet();return;}
+  if(x=T('[data-same]')){closeSheet();st.a=+x.dataset.same;st.t=null;renderArtists();renderSlots();go('book');return;}
+  if(x=T('[data-seg]')){st.seg=x.dataset.seg;renderMe();return;}
+  if(T('[data-cancel]')){st.mine=null;renderMe();renderSlots();toast('已取消预约，定金 ¥50 将原路退回');return;}
+  if(T('[data-resched]')){const m=st.mine;st.a=m.a;st.d=m.d;st.mine=null;st.t=null;renderArtists();renderDays();renderSlots();go('book');$('#bookTitle').textContent='改期';toast('选一个新的时间');return;}
+  if(x=T('[data-od]')){st.od=+x.dataset.od;renderOwner();return;}
+  if(T('[data-confirm]')){st.mine.status='ok';renderOwner();toast('已确认，已通知客人');return;}
+  if(x=T('[data-cell]')){
+    const k=x.dataset.cell,[a,d,t]=k.split('-').map(Number);
+    if(x.classList.contains('free')){st.off.add(k);toast(`${artists[a].n} ${times[t]} 设为休息`);renderOwner();renderSlots();}
+    else if(x.classList.contains('off')){st.off.delete(k);toast(`${artists[a].n} ${times[t]} 恢复可约`);renderOwner();renderSlots();}
+    else if(x.classList.contains('new')){st.mine.status='ok';renderOwner();toast('已确认，已通知客人');}
+    else if(x.dataset.info){toast(x.dataset.info);}
+    else toast('阿柚　韩式上镜妆　已确认');
+    return;
+  }
+  if(x=T('.chip')){x.parentElement.querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',c===x));return;}
+  if(x=T('[data-go]')){if(x.dataset.f){st.wf=x.dataset.f;renderWorks();}go(x.dataset.go);}
+});
+function go(v){
+  if(v==='done'&&!st.mine){makeBooking();}
+  if(v==='done'&&st.mine){$('#ticket').innerHTML=ticketHTML(st.mine);}
+  if(v==='book'&&!document.querySelector('[data-view="book"]').hidden===false){}
+  if(v!=='book')$('#bookTitle').textContent='预约';
+  if(v==='me')renderMe();
+  if(v==='owner'){if(st.mine)st.od=st.mine.d;renderOwner();}
+  closeSheet();
+  document.querySelectorAll('.view').forEach(s=>{s.hidden=s.dataset.view!==v;s.classList.remove('show');});
+  const cur=document.querySelector(`[data-view="${v}"]`);
+  requestAnimationFrame(()=>cur.classList.add('show'));
+  const sc=cur.querySelector('.scroll');if(sc)sc.scrollTop=0;
+  document.querySelectorAll('#jump button').forEach(b=>b.setAttribute('aria-current',b.dataset.go===v));
+}
+let tt;function toast(m){const el=$('#toast');el.textContent=m;el.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('on'),1800);}
+renderArtists();renderDays();renderSlots();renderWorks();go('home');
+</script>
+</body>
+</html>
