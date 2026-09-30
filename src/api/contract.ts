@@ -1,6 +1,7 @@
 import type {
   Artist, Booking, CreateBookingReq, CreateBookingResp, DateStr, DaySchedule,
-  ID, Me, RescheduleReq, Service, Shop, SlotView, StyleCategory, TimeStr, Work,
+  ID, Me, RescheduleReq, Service, Shop, SkinProfile, SlotView, StyleCategory, TimeStr,
+  UpdateSkinProfileReq, Work,
 } from './types'
 
 /**
@@ -21,6 +22,15 @@ export interface Api {
   login(): Promise<Me>
   /** GET /me */
   getMe(): Promise<Me>
+
+  // ---------- 肤质档案 ----------
+  /** GET /me/skin-profile  没填过返回 {} */
+  getSkinProfile(): Promise<SkinProfile>
+  /**
+   * PUT /me/skin-profile  整份替换，返回保存后的档案；同时更新 Me.skinProfile 摘要。
+   * 文本超过 200 字返回 400 UNKNOWN（前端已限制长度，正常走不到）
+   */
+  updateSkinProfile(req: UpdateSkinProfileReq): Promise<SkinProfile>
 
   // ---------- 基础资料 ----------
   /** GET /artists */
@@ -48,7 +58,7 @@ export interface Api {
    * 后端需保证同一 (artistId, date, time) 不会被重复预约，冲突返回 409 SLOT_TAKEN
    *
    * 订阅消息：客人点“付定金并预约”“继续付定金”时，前端请求订阅“预约确认”“到店提醒”两个一次性模板
-   * （模板 ID 见 utils/subscribe.ts）。后端在 confirmBooking 后发预约确认，在开始前发到店提醒；
+   * （模板 ID 见 utils/subscribe.ts）。后端在 confirmBooking 后发预约确认，在开始前一天发到店提醒（成功页文案写的是“前一天也会提醒你”）；
    * 客人没同意时微信会返回 43101，后端忽略即可，不影响预约。
    */
   createBooking(req: CreateBookingReq): Promise<CreateBookingResp>
@@ -73,7 +83,10 @@ export interface Api {
   // ---------- 排班（店主端，需要 owner 角色） ----------
   /** GET /owner/dates  排班可查看的日期（从今天起），和客人端的 /dates 不同，包含今天 */
   listScheduleDates(): Promise<DateStr[]>
-  /** GET /owner/schedule?date= */
+  /**
+   * GET /owner/schedule?date=
+   * booking.alert / note 要合并客人档案：档案或这次预约选了敏感肌、档案里写了过敏，都要让化妆师看到
+   */
   getDaySchedule(date: DateStr): Promise<DaySchedule>
   /** POST /owner/bookings/:id/confirm  确认后给客人发订阅消息。开始时间已过返回 INVALID_STATE */
   confirmBooking(id: ID): Promise<Booking>

@@ -6,7 +6,8 @@ import type { Api } from './contract'
 import {
   ApiError, type Artist, type Booking, type BookingStatus, type CreateBookingReq,
   type DateStr, type DaySchedule, type ID, type Me, type OwnerBookingBrief,
-  type ScheduleCell, type Service, type Shop, type SlotView, type TimeStr, type Work,
+  type ScheduleCell, type Service, type Shop, type SkinProfile, type SkinType, type SlotView,
+  type TimeStr, type UpdateSkinProfileReq, type Work, TONE_LABEL,
 } from './types'
 import { upcomingDates, datesFromToday, toTimestamp, hoursUntil, todayStr, nowTimeStr } from '../utils/date'
 
@@ -69,7 +70,24 @@ const shop: Shop = {
 }
 
 /** 演示时同一个人既是客人也是店主，方便一台手机走完整流程。改成 'customer' 可隐藏店主入口 */
-const me: Me = { id: 'u1', nickname: '阿柚', avatar: 'placeholder:g4', role: 'owner', visitCount: 0, skinProfile: '敏感肌 · 冷白皮' }
+const me: Me = { id: 'u1', nickname: '阿柚', avatar: 'placeholder:g4', role: 'owner', visitCount: 0 }
+
+/** 原型里“敏感肌 · 冷白皮”、排班里“对酒精过敏”都来自这份档案 */
+let skinProfile: SkinProfile = {
+  skinType: 'sensitive', tone: 'cool_fair', allergies: '对酒精过敏', updatedAt: '2026-08-16T08:00:00+08:00',
+}
+
+/** 摘要里的叫法和日常说法一致，“不确定”不写进摘要 */
+const SKIN_SUMMARY: Partial<Record<SkinType, string>> = {
+  dry: '干皮', oily: '油皮', combination: '混合皮', sensitive: '敏感肌',
+}
+
+/** 例如“敏感肌 · 冷白皮”；只填了文字说明时写“已填写” */
+function skinSummary(p: SkinProfile): string | undefined {
+  const parts = [p.skinType && SKIN_SUMMARY[p.skinType], p.tone && p.tone !== 'unsure' && TONE_LABEL[p.tone]].filter(Boolean)
+  if (parts.length) return parts.join(' · ')
+  return p.skinType || p.tone || p.allergies || p.note ? '已填写' : undefined
+}
 
 const OTHER_NAMES = ['林小姐', '陈小姐', '周小姐', '许小姐', '黄小姐', '吴小姐', '郑小姐', '何小姐']
 const OTHER_SERVICES = ['上镜妆', '约会妆', '新娘试妆', '主持妆', '面试妆']
@@ -165,7 +183,22 @@ function out(b: Booking): Booking {
 
 /** visitCount 按契约由预约记录算出：completed 的条数 */
 function outMe(): Me {
-  return { ...clone(me), visitCount: bookings.filter(b => b.status === 'completed').length }
+  return {
+    ...clone(me),
+    visitCount: bookings.filter(b => b.status === 'completed').length,
+    skinProfile: skinSummary(skinProfile),
+  }
+}
+
+/** 合并这次预约和客人档案里需要化妆师提前知道的 */
+function ownerAlert(bookingSkin?: SkinType, bookingNote?: string) {
+  const sensitive = bookingSkin === 'sensitive' || skinProfile.skinType === 'sensitive'
+  const allergies = skinProfile.allergies
+  const note = [bookingNote, allergies && `过敏：${allergies}`].filter(Boolean).join('；')
+  return {
+    alert: sensitive ? '敏感肌' : allergies ? '有过敏' : undefined,
+    note: note || undefined,
+  }
 }
 
 function requireOwner() {
@@ -187,6 +220,19 @@ export async function __simulatePaid(id: ID) {
 export const mockApi: Api = {
   async login() { await delay(); return outMe() },
   async getMe() { await delay(100); return outMe() },
+
+  async getSkinProfile() { await delay(150); return clone(skinProfile) },
+  async updateSkinProfile(req: UpdateSkinProfileReq) {
+    await delay(400)
+    const text = (s?: string) => s?.trim() || undefined
+    skinProfile = {
+      skinType: req.skinType, tone: req.tone,
+      allergies: text(req.allergies), note: text(req.note),
+      updatedAt: toTimestamp(new Date()),
+    }
+    // 去掉 undefined，和 JSON 返回一致
+    return clone(skinProfile)
+  },
 
   async listArtists() { await delay(); return clone(artists) },
   async listServices() { await delay(); return clone(services) },
@@ -294,7 +340,7 @@ export const mockApi: Api = {
         if (real) {
           const brief: OwnerBookingBrief = {
             id: real.id, customerName: me.nickname, serviceName: real.serviceName, status: real.status,
-            alert: real.skinType === 'sensitive' ? '敏感肌' : undefined, note: real.note,
+            ...ownerAlert(real.skinType, real.note),
             canConfirm: real.status === 'pending_confirm' && !isPast(real.date, real.time),
           }
           // pending_payment 也算占着：付款截止前为客人保留

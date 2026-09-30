@@ -93,6 +93,8 @@ const qs = (o: Record<string, string | undefined>) => {
 export const httpApi: Api = {
   login: doLogin,
   getMe: () => request('GET', '/me'),
+  getSkinProfile: () => request('GET', '/me/skin-profile'),
+  updateSkinProfile: (req) => request('PUT', '/me/skin-profile', req),
 
   listArtists: () => request('GET', '/artists'),
   listServices: () => request('GET', '/services'),

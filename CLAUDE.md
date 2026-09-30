@@ -84,6 +84,7 @@ src/
 | pages/booking/reschedule | 改期（普通页面，query 带 `rescheduleId`，和预约页共用 `SlotPicker`） | 预约 |
 | pages/booking/success | 预约成功 | 预约成功 |
 | pages/me/index | 我的预约 | 我的预约 |
+| pages/me/skin | 肤质档案（普通页面，从“我的”进入） | 无（原型只有入口，按预约页表单样式做） |
 | pages-owner/schedule/index | 店主排班（分包） | 排班 |
 
 TabBar 包含首页、作品、预约、我的，使用 `pages.json` 的原生 tabBar。图标需要 PNG 格式（81×81），放在 `static/tab/`。
