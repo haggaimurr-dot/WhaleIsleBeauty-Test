@@ -74,6 +74,7 @@ const me: Me = { id: 'u1', nickname: '阿柚', avatar: 'placeholder:g4', role: '
 const OTHER_NAMES = ['林小姐', '陈小姐', '周小姐', '许小姐', '黄小姐', '吴小姐', '郑小姐', '何小姐']
 const OTHER_SERVICES = ['上镜妆', '约会妆', '新娘试妆', '主持妆', '面试妆']
 const ACTIVE: BookingStatus[] = ['pending_payment', 'pending_confirm', 'confirmed']
+const PAY_WINDOW_MS = 15 * 60 * 1000
 
 // ---------- 工具 ----------
 
@@ -116,7 +117,31 @@ const bookings: Booking[] = (
 const blocks = new Set<string>()
 let seq = 100
 
+/** 模拟后端的定时任务：超过付款截止时间的 pending_payment 自动取消，释放时段 */
+function expireUnpaid() {
+  const now = Date.now()
+  for (const b of bookings) {
+    if (b.status === 'pending_payment' && b.payDeadline && Date.parse(b.payDeadline) <= now) {
+      b.status = 'cancelled'
+      delete b.payDeadline
+    }
+  }
+}
+
+function getBookingOrThrow(id: ID) {
+  expireUnpaid()
+  return getOrThrow(bookings, id)
+}
+
+function payParams(b: Booking) {
+  return {
+    timeStamp: String(Math.floor(Date.now() / 1000)), nonceStr: 'mock',
+    package: `prepay_id=mock_${b.id}`, signType: 'RSA' as const, paySign: 'mock',
+  }
+}
+
 function findActive(artistId: ID, date: DateStr, time: TimeStr) {
+  expireUnpaid()
   return bookings.find(b => b.artistId === artistId && b.date === date && b.time === time && ACTIVE.includes(b.status))
 }
 
@@ -134,7 +159,7 @@ function isAvailable(artistId: ID, date: DateStr, time: TimeStr, ignoreBookingId
 
 function out(b: Booking): Booking {
   const c = clone(b)
-  c.canCancel = ACTIVE.includes(c.status) && hoursUntil(c.date, c.time) >= 24
+  c.canCancel = c.status === 'pending_payment' || (ACTIVE.includes(c.status) && hoursUntil(c.date, c.time) >= 24)
   return c
 }
 
@@ -150,8 +175,11 @@ function requireOwner() {
 /** mock 专用：模拟微信支付回调。真实环境由微信支付通知后端完成状态变更。 */
 export async function __simulatePaid(id: ID) {
   await delay(600)
-  const b = getOrThrow(bookings, id)
-  if (b.status === 'pending_payment') b.status = 'pending_confirm'
+  const b = getBookingOrThrow(id)
+  if (b.status === 'pending_payment') {
+    b.status = 'pending_confirm'
+    delete b.payDeadline
+  }
 }
 
 // ---------- 实现 ----------
@@ -193,23 +221,30 @@ export const mockApi: Api = {
       status: 'pending_payment',
       occasion: req.occasion, skinType: req.skinType, note: req.note,
       createdAt: toTimestamp(new Date()), canCancel: true,
+      payDeadline: toTimestamp(new Date(Date.now() + PAY_WINDOW_MS)),
     }
     bookings.push(booking)
-    return {
-      booking: out(booking),
-      payment: {
-        timeStamp: String(Math.floor(Date.now() / 1000)), nonceStr: 'mock',
-        package: `prepay_id=mock_${booking.id}`, signType: 'RSA', paySign: 'mock',
-      },
-    }
+    return { booking: out(booking), payment: payParams(booking) }
   },
 
-  async getBooking(id) { await delay(150); return out(getOrThrow(bookings, id)) },
+  async getBooking(id) { await delay(150); return out(getBookingOrThrow(id)) },
+
+  async resumePayment(id) {
+    await delay(300)
+    const b = getBookingOrThrow(id)
+    if (b.status !== 'pending_payment') {
+      throw new ApiError('INVALID_STATE', b.status === 'cancelled'
+        ? '超过 15 分钟没付定金，这个时段已经放出去了，重新约一次吧'
+        : '这个预约已经付过定金了')
+    }
+    return { booking: out(b), payment: payParams(b) }
+  },
 
   async listMyBookings(scope) {
     await delay()
     const upcoming = scope === 'upcoming'
-    const wanted: BookingStatus[] = upcoming ? ['pending_confirm', 'confirmed'] : ['completed', 'cancelled']
+    expireUnpaid()
+    const wanted: BookingStatus[] = upcoming ? ACTIVE : ['completed', 'cancelled']
     return bookings
       .filter(b => wanted.includes(b.status))
       .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time) * (upcoming ? 1 : -1))
@@ -218,16 +253,17 @@ export const mockApi: Api = {
 
   async cancelBooking(id) {
     await delay()
-    const b = getOrThrow(bookings, id)
+    const b = getBookingOrThrow(id)
     if (!ACTIVE.includes(b.status)) throw new ApiError('INVALID_STATE', '这个预约的状态已经变了')
     if (!out(b).canCancel) throw new ApiError('CANCEL_TOO_LATE', '距离开始不到 24 小时，需要取消请直接联系门店')
     b.status = 'cancelled'
+    delete b.payDeadline
     return out(b)
   },
 
   async rescheduleBooking(id, req) {
     await delay(400)
-    const b = getOrThrow(bookings, id)
+    const b = getBookingOrThrow(id)
     if (!ACTIVE.includes(b.status)) throw new ApiError('INVALID_STATE', '这个预约的状态已经变了')
     if (!out(b).canCancel) throw new ApiError('CANCEL_TOO_LATE', '距离开始不到 24 小时，需要改期请直接联系门店')
     if (!isAvailable(req.artistId, req.date, req.time, b.id)) {
@@ -291,7 +327,7 @@ export const mockApi: Api = {
   async confirmBooking(id) {
     await delay()
     requireOwner()
-    const b = getOrThrow(bookings, id)
+    const b = getBookingOrThrow(id)
     if (b.status !== 'pending_confirm') throw new ApiError('INVALID_STATE', '这个预约已经处理过了')
     if (isPast(b.date, b.time)) throw new ApiError('INVALID_STATE', '预约时间已经过了，不能再确认')
     b.status = 'confirmed'

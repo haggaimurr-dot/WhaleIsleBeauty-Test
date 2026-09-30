@@ -50,9 +50,18 @@ export interface Api {
   createBooking(req: CreateBookingReq): Promise<CreateBookingResp>
   /** GET /bookings/:id  支付后轮询状态用 */
   getBooking(id: ID): Promise<Booking>
-  /** GET /bookings/mine?scope=upcoming|past */
+  /**
+   * GET /bookings/mine?scope=upcoming|past
+   * upcoming：pending_payment、pending_confirm、confirmed，按开始时间升序
+   * past：completed、cancelled，按开始时间降序。超时未付的 pending_payment 已被自动取消，出现在 past
+   */
   listMyBookings(scope: 'upcoming' | 'past'): Promise<Booking[]>
-  /** POST /bookings/:id/cancel  距离开始不足 24 小时返回 CANCEL_TOO_LATE */
+  /**
+   * POST /bookings/:id/pay  继续付定金：给 pending_payment 的预约重新生成支付参数
+   * 已超过 payDeadline 或状态不是 pending_payment 时返回 INVALID_STATE
+   */
+  resumePayment(id: ID): Promise<CreateBookingResp>
+  /** POST /bookings/:id/cancel  距离开始不足 24 小时返回 CANCEL_TOO_LATE（pending_payment 不受限制） */
   cancelBooking(id: ID): Promise<Booking>
   /** POST /bookings/:id/reschedule  同样受 24 小时规则限制，改期后回到 pending_confirm */
   rescheduleBooking(id: ID, req: RescheduleReq): Promise<Booking>

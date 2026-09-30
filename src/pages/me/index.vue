@@ -29,7 +29,7 @@
           <AppButton @click="switchTab('booking')">去预约</AppButton>
         </view>
 
-        <view v-for="b in upcoming" :key="b.id" class="bcard">
+        <view v-for="b in upcomingSorted" :key="b.id" class="bcard">
           <view class="bcard__head">
             <view>
               <view class="bcard__when">{{ formatDateCN(b.date) }}</view>
@@ -42,17 +42,26 @@
             <ArchImage class="bcard__avatar" :src="artistAvatar(b.artistId)" />
             <view class="bcard__text">
               <view class="bcard__service">{{ b.serviceName }}</view>
-              化妆师 {{ b.artistName }}　已付定金 {{ formatPrice(b.deposit) }}
+              化妆师 {{ b.artistName }}　{{ isUnpaid(b) ? '定金' : '已付定金' }} {{ formatPrice(b.deposit) }}{{ isUnpaid(b) ? ' 还没付' : '' }}
             </view>
           </view>
 
-          <view class="bcard__note">
+          <view v-if="isUnpaid(b)" class="bcard__note bcard__note--wait">
+            {{ b.payDeadline ? `${formatClock(b.payDeadline)} 前付完定金，这个时段会一直为你留着；过了会自动放出去。` : '付完定金才算约好，时段为你保留 15 分钟。' }}
+          </view>
+          <view v-else class="bcard__note">
             {{ b.canCancel
               ? '开始前 24 小时以上可以免费改期或取消，定金原路退回。'
               : '距离开始不到 24 小时了，需要改期或取消请直接联系门店。' }}
           </view>
 
-          <view class="bcard__acts">
+          <view v-if="isUnpaid(b)" class="bcard__acts">
+            <AppButton variant="ghost" size="sm" :loading="cancellingId === b.id" loading-text="正在取消…" @click="cancel(b)">
+              取消预约
+            </AppButton>
+            <AppButton size="sm" :loading="payingId === b.id" loading-text="正在付定金…" @click="continuePay(b)">继续付定金</AppButton>
+          </view>
+          <view v-else class="bcard__acts">
             <template v-if="b.canCancel">
               <AppButton variant="ghost" size="sm" :loading="cancellingId === b.id" loading-text="正在取消…" @click="cancel(b)">
                 取消预约
@@ -100,10 +109,10 @@
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import {
-  api, errorText, ApiError,
+  api, payDeposit, errorText, ApiError,
   type Artist, type Booking, type ID, type Me, type Service, type Shop,
 } from '@/api'
-import { formatDateCN, formatMonthDay } from '@/utils/date'
+import { formatClock, formatDateCN, formatMonthDay } from '@/utils/date'
 import { formatPrice } from '@/utils/money'
 import { switchTab } from '@/utils/tab'
 import AppButton from '@/components/AppButton.vue'
@@ -134,6 +143,14 @@ const visitText = computed(() => {
   const n = (me.value?.visitCount ?? 0) + 1
   return n === 1 ? '第一次来鲸屿，欢迎' : `这是你第 ${n} 次来鲸屿`
 })
+
+const isUnpaid = (b: Booking) => b.status === 'pending_payment'
+
+/** 待付定金的有截止时间，放在最前面；其余保持接口给的时间顺序 */
+const upcomingSorted = computed(() => [
+  ...upcoming.value.filter(isUnpaid),
+  ...upcoming.value.filter(b => !isUnpaid(b)),
+])
 
 const artistAvatar = (id: ID) => artists.value.find(a => a.id === id)?.avatar ?? 'placeholder:blank'
 const serviceCover = (id: ID) => services.value.find(s => s.id === id)?.cover ?? 'placeholder:blank'
@@ -174,9 +191,10 @@ const toast = (title: string) => uni.showToast({ title, icon: 'none', duration: 
 const cancellingId = ref<ID>()
 
 function cancel(b: Booking) {
+  const unpaid = isUnpaid(b)
   uni.showModal({
     title: '取消这个预约？',
-    content: `定金 ${formatPrice(b.deposit)} 会原路退回。`,
+    content: unpaid ? '还没付定金，取消后这个时段会放给别人。' : `定金 ${formatPrice(b.deposit)} 会原路退回。`,
     confirmText: '取消预约',
     cancelText: '再想想',
     confirmColor: '#6E5446',
@@ -185,7 +203,7 @@ function cancel(b: Booking) {
       cancellingId.value = b.id
       try {
         await api.cancelBooking(b.id)
-        toast(`已取消预约，定金 ${formatPrice(b.deposit)} 将原路退回`)
+        toast(unpaid ? '已取消预约' : `已取消预约，定金 ${formatPrice(b.deposit)} 将原路退回`)
       } catch (e) {
         if (e instanceof ApiError && e.code === 'CANCEL_TOO_LATE') {
           uni.showModal({ title: '没法在线取消了', content: errorText(e), confirmText: '联系门店', cancelText: '知道了',
@@ -199,6 +217,22 @@ function cancel(b: Booking) {
       }
     },
   })
+}
+
+const payingId = ref<ID>()
+
+async function continuePay(b: Booking) {
+  if (payingId.value) return
+  payingId.value = b.id
+  try {
+    const paid = await payDeposit(await api.resumePayment(b.id))
+    uni.navigateTo({ url: `/pages/booking/success?id=${paid.id}` })
+  } catch (e) {
+    toast(errorText(e))
+  } finally {
+    payingId.value = undefined
+    load()
+  }
 }
 
 const reschedule = (b: Booking) => uni.navigateTo({ url: `/pages/booking/reschedule?rescheduleId=${b.id}` })
@@ -330,6 +364,11 @@ const openOwner = () => uni.navigateTo({ url: '/pages-owner/schedule/index' })
     font-size: $fs-caption + 2rpx;
     line-height: 1.6;
     color: $sage-ink;
+
+    // 待付定金不是安全感信息，不用鼠尾草绿
+    &--wait {
+      color: $blush-ink;
+    }
   }
 
   &__acts {

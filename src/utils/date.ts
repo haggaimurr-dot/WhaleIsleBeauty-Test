@@ -47,6 +47,12 @@ export function dayLabel(date: DateStr): string {
   return date === upcomingDates(1)[0] ? '明天' : `周${WEEK[parse(date).getDay()]}`
 }
 
+/** ISO 时间戳 → 本地 'HH:mm'，用于付款截止时间 */
+export function formatClock(ts: Timestamp): TimeStr {
+  const d = new Date(ts)
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 export const dayOfMonth = (date: DateStr) => parse(date).getDate()
 
 export function hoursUntil(date: DateStr, time: TimeStr): number {

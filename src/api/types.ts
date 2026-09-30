@@ -151,8 +151,13 @@ export interface Booking {
   skinType?: SkinType
   note?: string
   createdAt: Timestamp
-  /** 服务端计算，前端据此决定是否显示“取消预约”和“改期” */
+  /**
+   * 服务端计算，前端据此决定是否显示“取消预约”和“改期”。
+   * pending_payment 还没收钱，始终为 true；其他进行中的状态距离开始 24 小时以上才为 true。
+   */
   canCancel: boolean
+  /** 仅 pending_payment 有：付定金的截止时间（下单后 15 分钟），过了由后端自动取消 */
+  payDeadline?: Timestamp
 }
 
 export interface CreateBookingReq {

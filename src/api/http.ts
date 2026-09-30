@@ -106,6 +106,7 @@ export const httpApi: Api = {
   createBooking: (req) => request('POST', '/bookings', req),
   getBooking: (id) => request('GET', `/bookings/${id}`),
   listMyBookings: (scope) => request('GET', '/bookings/mine' + qs({ scope })),
+  resumePayment: (id) => request('POST', `/bookings/${id}/pay`),
   cancelBooking: (id) => request('POST', `/bookings/${id}/cancel`),
   rescheduleBooking: (id, req) => request('POST', `/bookings/${id}/reschedule`, req),
 
