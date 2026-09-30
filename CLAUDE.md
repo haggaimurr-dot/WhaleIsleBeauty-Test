@@ -2,7 +2,7 @@
 
 私人化妆工作室的微信小程序。客人端用于看作品、预约、管理自己的预约；店主端用于排班和确认预约。两端在同一个小程序里，按用户角色显示入口。
 
-当前阶段是**演示版**：所有数据来自本地 mock，不接真实后端、不接真实支付。后端将来用 Go 实现，部署在**微信云托管**，前端通过 `wx.cloud.callContainer` 调用（见 `src/api/http.ts`），接口契约已经定义在 `src/api/contract.ts`。
+当前阶段是**演示版**：所有数据来自本地 mock，不接真实后端、不接真实支付。后端将来用 Go 实现，部署在**微信云托管**，前端通过 `wx.cloud.callContainer` 调用（见 `src/api/http.ts`），接口契约已经定义在 `src/api/contract.ts`。后端代码在本仓库的 `server/` 目录，以这里的契约为准实现；改契约时两边都要跟着改。（`D:\proj\jingyu-api` / `haggaimurr-dot/WhaleIsleBeauty-API` 是之前另起的后端，已停用归档，不要再往里写。）
 
 ## 技术栈
 
@@ -18,6 +18,7 @@ npm run dev:mp-weixin      # 开发，产物在 dist/dev/mp-weixin，用微信�
 npm run build:mp-weixin    # 构建
 npx vue-tsc --noEmit       # 类型检查，每完成一个任务都要跑一次并确保通过
 npm test                   # 单元测试（vitest），改了 api / mock / utils 都要跑
+cd server && go test ./...  # 后端测试，改了 server/ 要跑
 ```
 
 测试放在旁边的 `__tests__/` 目录里，只测纯 TS 逻辑（mock 的业务规则、请求层、工具函数），不测页面。mock 每次调用有假延迟，用 `src/test/helpers.ts` 的 `freshMock()` 拿一份全新的 mock，假时钟会自动快进。改了业务规则（契约或 mock）时，先补测试再改。
@@ -71,6 +72,10 @@ src/
   pages-owner/     # 店主端分包
   test/            # 测试工具（helpers.ts）
 ```
+
+`server/` 是 Go 后端（只用标准库 + MySQL 驱动），业务规则在 `app.go`，要和 `mock.ts` 的行为一致；改了契约时两边一起改。
+部署在云托管服务 `jingyu-api`，环境变量见 `server/main.go` 顶部注释。还没有商户号，`PAY_MODE=fake` 时由 `/v1/bookings/:id/fake-paid` 代替支付回调，只有店主和 `FAKE_PAY_OPENIDS` 里的测试人员能用。`PAY_MODE` 没有默认值，不设服务起不来，防止假支付被带上线。
+表结构在 `server/migrations/`，启动时按文件名顺序执行没跑过的；已经执行过的文件不要改，改表结构加新文件。
 
 ## 数据规则（重要）
 

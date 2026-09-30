@@ -63,7 +63,7 @@ export interface Api {
    * 后端需保证同一 (artistId, date, time) 不会被重复预约，冲突返回 409 SLOT_TAKEN
    *
    * 订阅消息：客人点“付定金并预约”“继续付定金”时，前端请求订阅“预约确认”“到店提醒”两个一次性模板
-   * （模板 ID 见 utils/subscribe.ts）。后端在 confirmBooking 后发预约确认，在开始前一天发到店提醒（成功页文案写的是“前一天也会提醒你”）；
+   * （模板 ID 和发送时 data 的字段对应见 utils/subscribe.ts）。后端在 confirmBooking 后发预约确认，在开始前一天发到店提醒（成功页文案写的是“前一天也会提醒你”）；
    * 客人没同意时微信会返回 43101，后端忽略即可，不影响预约。
    */
   createBooking(req: CreateBookingReq): Promise<CreateBookingResp>
@@ -82,7 +82,7 @@ export interface Api {
   resumePayment(id: ID): Promise<CreateBookingResp>
   /** POST /bookings/:id/cancel  距离开始不足 24 小时返回 CANCEL_TOO_LATE（pending_payment 不受限制） */
   cancelBooking(id: ID): Promise<Booking>
-  /** POST /bookings/:id/reschedule  同样受 24 小时规则限制，改期后回到 pending_confirm。到店提醒按新时间发 */
+  /** POST /bookings/:id/reschedule  同样受 24 小时规则限制，改期后回到 pending_confirm（还没付定金的仍是 pending_payment）。到店提醒按新时间发 */
   rescheduleBooking(id: ID, req: RescheduleReq): Promise<Booking>
 
   // 自动取消（后端定时任务，没有接口）：

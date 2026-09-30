@@ -59,6 +59,7 @@ describe('subscribe', () => {
     })
     const saved = { ...SUBSCRIBE_TEMPLATES }
     try {
+      Object.assign(SUBSCRIBE_TEMPLATES, { confirmed: '', reminder: '' })
       await requestSubscribe(['confirmed', 'reminder'])
       expect(calls).toHaveLength(0)
       SUBSCRIBE_TEMPLATES.confirmed = 'T1'

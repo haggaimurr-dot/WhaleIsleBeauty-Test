@@ -1,11 +1,12 @@
 import { api, USE_MOCK } from './client'
 import { __simulatePaid } from './mock'
+import { fakePaid, isFakePayment } from './http'
 import { ApiError, type Booking, type CreateBookingResp } from './types'
 import { formatPrice } from '../utils/money'
 
 const NOT_PAID = '还没付定金，时段为你保留 15 分钟，可以在「我的」里继续付'
 
-/** 演示用：用弹窗代替微信支付，选“先不付”可以走到待付定金的流程 */
+/** 演示和联调用：用弹窗代替微信支付，选“先不付”可以走到待付定金的流程 */
 function mockPayDialog(booking: Booking): Promise<boolean> {
   return new Promise(resolve => {
     uni.showModal({
@@ -29,6 +30,9 @@ export async function payDeposit({ booking, payment }: CreateBookingResp): Promi
   if (USE_MOCK) {
     if (!(await mockPayDialog(booking))) throw new ApiError('INVALID_STATE', NOT_PAID)
     await __simulatePaid(booking.id)
+  } else if (isFakePayment(payment)) {
+    if (!(await mockPayDialog(booking))) throw new ApiError('INVALID_STATE', NOT_PAID)
+    await fakePaid(booking.id)
   } else {
     try {
       await uni.requestPayment({ provider: 'wxpay', orderInfo: '', ...payment })

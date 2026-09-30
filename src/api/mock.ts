@@ -329,7 +329,9 @@ export const mockApi: Api = {
     }
     Object.assign(b, {
       artistId: req.artistId, artistName: artistName(req.artistId),
-      date: req.date, time: req.time, status: 'pending_confirm',
+      date: req.date, time: req.time,
+      // 付过定金的要店里重新确认；还没付的仍是待付定金，不能借改期绕过付款
+      status: b.status === 'pending_payment' ? 'pending_payment' : 'pending_confirm',
     })
     return out(b)
   },

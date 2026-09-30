@@ -8,7 +8,7 @@
  */
 import { API_PREFIX, BASE_URL, CLOUD_ENV, CLOUD_SERVICE, TRANSPORT } from './config'
 import type { Api } from './contract'
-import { ApiError, type ErrorCode, type Me } from './types'
+import { ApiError, type Booking, type ErrorCode, type ID, type Me, type WxPayParams } from './types'
 
 const TOKEN_KEY = 'jy_token'
 
@@ -170,3 +170,10 @@ export const httpApi: Api = {
   blockSlot: (artistId, date, time) => request('PUT', '/owner/blocks', { artistId, date, time }),
   unblockSlot: (artistId, date, time) => request('DELETE', '/owner/blocks', { artistId, date, time }),
 }
+
+/**
+ * 联调用：还没有微信支付商户号时，后端（PAY_MODE=fake）返回假的支付参数，
+ * pay.ts 用弹窗代替微信支付，再调 fakePaid 模拟支付回调。接真支付后删掉这两个
+ */
+export const isFakePayment = (p: WxPayParams) => p.package.startsWith('prepay_id=fake_')
+export const fakePaid = (id: ID) => request<Booking>('POST', `/bookings/${id}/fake-paid`)
