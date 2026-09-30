@@ -160,14 +160,15 @@ async function load() {
   // 已有数据时静默刷新，不闪空白
   if (status.value !== 'ok') status.value = 'loading'
   try {
-    const base = me.value
-      ? []
-      : [
-          api.getMe().then(v => { me.value = v }),
-          api.getShop().then(v => { shop.value = v }),
-          api.listArtists().then(v => { artists.value = v }),
-          api.listServices().then(v => { services.value = v }),
-        ]
+    // me 每次都刷新：肤质档案改完回来，摘要要跟着变
+    const base = [api.getMe().then(v => { me.value = v })]
+    if (!shop.value) {
+      base.push(
+        api.getShop().then(v => { shop.value = v }),
+        api.listArtists().then(v => { artists.value = v }),
+        api.listServices().then(v => { services.value = v }),
+      )
+    }
     const [up, done] = await Promise.all([
       api.listMyBookings('upcoming'),
       api.listMyBookings('past'),
@@ -250,7 +251,7 @@ function navigate() {
 
 // ---------- 菜单 ----------
 
-const openSkinProfile = () => toast('肤质档案下一版就能填写')
+const openSkinProfile = () => uni.navigateTo({ url: '/pages/me/skin' })
 
 function callShop() {
   if (shop.value) uni.makePhoneCall({ phoneNumber: shop.value.phone })

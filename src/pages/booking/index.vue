@@ -39,6 +39,7 @@
       </view>
 
       <view class="h">你的肤质</view>
+      <view v-if="skinType && skinType === profileSkin" class="hint">按你的肤质档案选好了，这次不一样可以改</view>
       <view class="chips">
         <Chip
           v-for="s in SKINS"
@@ -113,6 +114,15 @@ const date = ref<DateStr>()
 const time = ref<TimeStr>()
 const occasion = ref<Occasion>()
 const skinType = ref<SkinType>()
+/** 肤质档案里的肤质，用来预选；客人手动改过就不再跟着档案变 */
+const profileSkin = ref<SkinType>()
+
+/** 档案拿不到不影响预约，当作没填 */
+async function syncProfileSkin() {
+  const p = await api.getSkinProfile().catch(() => ({ skinType: undefined }))
+  if (skinType.value === profileSkin.value) skinType.value = p.skinType
+  profileSkin.value = p.skinType
+}
 const note = ref('')
 
 const service = computed(() => services.value.find(s => s.id === serviceId.value))
@@ -158,6 +168,8 @@ async function load() {
 onLoad(load)
 
 onShow(() => {
+  // 从“我的”改完档案再切回来，预选跟着变
+  syncProfileSkin()
   const p = takeTabParams('booking')
   if (p) {
     pendingParams = p
@@ -232,7 +244,7 @@ async function resume(id: ID) {
 function resetForm() {
   time.value = undefined
   occasion.value = undefined
-  skinType.value = undefined
+  skinType.value = profileSkin.value
   note.value = ''
   // 刚约的时段要显示为已约满
   picker.value?.refresh()
@@ -288,6 +300,12 @@ function resetForm() {
   margin: 44rpx $page-x 24rpx;
   font-size: 30rpx;
   font-weight: 600;
+}
+
+.hint {
+  margin: -12rpx $page-x 20rpx;
+  font-size: $fs-caption;
+  color: $mute;
 }
 
 .chips {

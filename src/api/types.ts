@@ -92,9 +92,35 @@ export interface Me {
    * 不含已取消、待付定金和还没到的预约。前端显示“第 visitCount + 1 次来”。
    */
   visitCount: number
-  /** 客人自己填写的档案，二期功能 */
+  /**
+   * 肤质档案的一句话摘要，例如“敏感肌 · 冷白皮”，由服务端根据 SkinProfile 生成。
+   * 没填过或全部清空时不返回。完整内容用 getSkinProfile 取
+   */
   skinProfile?: string
 }
+
+// ---------- 肤质档案 ----------
+
+export type SkinTone = 'cool_fair' | 'warm_fair' | 'natural' | 'wheat' | 'unsure'
+
+export const TONE_LABEL: Record<SkinTone, string> = {
+  cool_fair: '冷白皮', warm_fair: '暖白皮', natural: '自然色', wheat: '小麦色', unsure: '不确定',
+}
+
+/** 客人自己填写，每次预约时化妆师都能提前看到。所有字段都可以不填 */
+export interface SkinProfile {
+  skinType?: SkinType
+  tone?: SkinTone
+  /** 过敏或不能用的成分、产品，例如“对酒精过敏”，不超过 200 字 */
+  allergies?: string
+  /** 其他想让化妆师知道的，例如“单眼皮”“戴隐形眼镜”，不超过 200 字 */
+  note?: string
+  /** 服务端写入；从没保存过时不返回 */
+  updatedAt?: Timestamp
+}
+
+/** 整份替换：不带的字段、空字符串都表示清空 */
+export type UpdateSkinProfileReq = Omit<SkinProfile, 'updatedAt'>
 
 // ---------- 预约（客人端） ----------
 

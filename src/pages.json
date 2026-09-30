@@ -7,7 +7,8 @@
 		{ "path": "pages/booking/index", "style": { "disableScroll": true, "navigationBarTitleText": "预约" } },
 		{ "path": "pages/booking/success", "style": { "disableScroll": true, "navigationBarTitleText": "" } },
 		{ "path": "pages/booking/reschedule", "style": { "disableScroll": true, "navigationBarTitleText": "改期" } },
-		{ "path": "pages/me/index", "style": { "disableScroll": true, "navigationBarTitleText": "" } }
+		{ "path": "pages/me/index", "style": { "disableScroll": true, "navigationBarTitleText": "" } },
+		{ "path": "pages/me/skin", "style": { "disableScroll": true, "navigationBarTitleText": "肤质档案" } }
 	],
 	"subPackages": [
 		{
