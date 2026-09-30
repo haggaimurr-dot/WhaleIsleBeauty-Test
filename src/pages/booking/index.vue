@@ -85,6 +85,7 @@ import {
 } from '@/api'
 import { formatDateCN } from '@/utils/date'
 import { formatPrice } from '@/utils/money'
+import { requestSubscribe } from '@/utils/subscribe'
 import { takeTabParams, type TabParams } from '@/utils/tab'
 import AppButton from '@/components/AppButton.vue'
 import ArchImage from '@/components/ArchImage.vue'
@@ -199,6 +200,8 @@ async function submit() {
 
   paying.value = true
   try {
+    // 必须是点击后第一个异步调用；等订阅弹窗关掉再拉起支付，两个弹窗不叠在一起
+    await requestSubscribe(['confirmed', 'reminder'])
     const resp = (unpaid?.key === key && await resume(unpaid.resp.booking.id)) || await api.createBooking(req)
     unpaid = { key, resp }
     const booking = await payDeposit(resp)
