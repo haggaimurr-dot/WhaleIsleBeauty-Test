@@ -18,6 +18,7 @@ npm run dev:mp-weixin      # 开发，产物在 dist/dev/mp-weixin，用微信�
 npm run build:mp-weixin    # 构建
 npx vue-tsc --noEmit       # 类型检查，每完成一个任务都要跑一次并确保通过
 npm test                   # 单元测试（vitest），改了 api / mock / utils 都要跑
+cd server && go test ./...  # 后端测试，改了 server/ 要跑
 ```
 
 测试放在旁边的 `__tests__/` 目录里，只测纯 TS 逻辑（mock 的业务规则、请求层、工具函数），不测页面。mock 每次调用有假延迟，用 `src/test/helpers.ts` 的 `freshMock()` 拿一份全新的 mock，假时钟会自动快进。改了业务规则（契约或 mock）时，先补测试再改。
@@ -71,6 +72,9 @@ src/
   pages-owner/     # 店主端分包
   test/            # 测试工具（helpers.ts）
 ```
+
+`server/` 是 Go 后端（只用标准库 + MySQL 驱动），业务规则在 `app.go`，要和 `mock.ts` 的行为一致；改了契约时两边一起改。
+部署在云托管服务 `jingyu-api`，环境变量见 `server/main.go` 顶部注释。还没有商户号，`PAY_MODE=fake` 时由 `/v1/bookings/:id/fake-paid` 代替支付回调。
 
 ## 数据规则（重要）
 
