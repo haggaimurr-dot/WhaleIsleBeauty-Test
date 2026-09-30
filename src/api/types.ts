@@ -145,6 +145,7 @@ export const SKIN_LABEL: Record<SkinType, string> = {
  * pending_payment --付定金--> pending_confirm --店主确认--> confirmed --到店完成--> completed
  * 除 completed 外都可以 --> cancelled
  * pending_payment 超过 15 分钟未支付，由后端自动取消并释放时段
+ * pending_confirm 到了开始时间店里还没确认，由后端自动取消，定金原路退回
  */
 export type BookingStatus =
   | 'pending_payment'
@@ -184,7 +185,16 @@ export interface Booking {
   canCancel: boolean
   /** 仅 pending_payment 有：付定金的截止时间（下单后 15 分钟），过了由后端自动取消 */
   payDeadline?: Timestamp
+  /** 仅 cancelled 有，前端据此说明为什么取消了 */
+  cancelReason?: CancelReason
 }
+
+/**
+ * customer：客人自己取消（含店里代客人取消）
+ * pay_timeout：超过 15 分钟没付定金
+ * not_confirmed：到了开始时间店里还没确认，定金已原路退回
+ */
+export type CancelReason = 'customer' | 'pay_timeout' | 'not_confirmed'
 
 export interface CreateBookingReq {
   serviceId: ID

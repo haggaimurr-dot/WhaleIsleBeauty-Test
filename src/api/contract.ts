@@ -80,6 +80,11 @@ export interface Api {
   /** POST /bookings/:id/reschedule  同样受 24 小时规则限制，改期后回到 pending_confirm。到店提醒按新时间发 */
   rescheduleBooking(id: ID, req: RescheduleReq): Promise<Booking>
 
+  // 自动取消（后端定时任务，没有接口）：
+  // - pending_payment 过了 payDeadline → cancelled，cancelReason = pay_timeout
+  // - pending_confirm 到了开始时间还没确认 → cancelled，cancelReason = not_confirmed，定金原路退回
+  //   不发订阅消息（没有对应模板），客人在「已完成」里看到原因。排班里 stats.stale 因此通常为 0，只在定时任务跑之前短暂出现
+
   // ---------- 排班（店主端，需要 owner 角色） ----------
   /** GET /owner/dates  排班可查看的日期（从今天起），和客人端的 /dates 不同，包含今天 */
   listScheduleDates(): Promise<DateStr[]>

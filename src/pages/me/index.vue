@@ -53,6 +53,7 @@
             {{ b.canCancel
               ? '开始前 24 小时以上可以免费改期或取消，定金原路退回。'
               : '距离开始不到 24 小时了，需要改期或取消请直接联系门店。' }}
+            {{ b.status === 'pending_confirm' ? '店里要是没来得及确认，到时间会自动取消，定金也原路退回。' : '' }}
           </view>
 
           <view v-if="isUnpaid(b)" class="bcard__acts">
@@ -85,6 +86,9 @@
             <view class="past__service">{{ b.serviceName }}</view>
             {{ formatMonthDay(b.date) }}　化妆师 {{ b.artistName }}
             <StatusBadge v-if="b.status === 'cancelled'" class="past__badge" :status="b.status" />
+            <view v-if="cancelNote(b)" class="past__why" :class="{ 'past__why--refund': b.cancelReason === 'not_confirmed' }">
+              {{ cancelNote(b) }}
+            </view>
           </view>
           <AppButton variant="ghost" size="sm" @click="bookAgain(b)">再约一次</AppButton>
         </view>
@@ -146,6 +150,13 @@ const visitText = computed(() => {
 })
 
 const isUnpaid = (b: Booking) => b.status === 'pending_payment'
+
+/** 自动取消的说明；客人自己取消的不用再解释 */
+function cancelNote(b: Booking) {
+  if (b.cancelReason === 'not_confirmed') return `店里没来得及确认，定金 ${formatPrice(b.deposit)} 已原路退回`
+  if (b.cancelReason === 'pay_timeout') return '没有付定金，时段已经放出去了'
+  return ''
+}
 
 /** 待付定金的有截止时间，放在最前面；其余保持接口给的时间顺序 */
 const upcomingSorted = computed(() => [
@@ -414,6 +425,15 @@ const openOwner = () => uni.navigateTo({ url: '/pages-owner/schedule/index' })
 
   &__badge {
     margin-left: 12rpx;
+  }
+
+  &__why {
+    margin-top: 4rpx;
+
+    // 退款属于安全感信息，用鼠尾草绿
+    &--refund {
+      color: $sage-ink;
+    }
   }
 }
 
