@@ -66,11 +66,12 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import {
   api, errorText, CATEGORY_LABEL,
   type Artist, type ID, type StyleCategory, type Work,
 } from '@/api'
+import { SHOP_NAME, shareImage, sharePath } from '@/utils/share'
 import { switchTab, takeTabParams } from '@/utils/tab'
 import AppButton from '@/components/AppButton.vue'
 import ArchImage from '@/components/ArchImage.vue'
@@ -118,6 +119,7 @@ async function loadWorks() {
     works.value = list
     artists.value = artistList
     status.value = 'ok'
+    openSharedWork()
   } catch (e) {
     if (seq !== requestSeq) return
     errorMsg.value = errorText(e)
@@ -130,6 +132,21 @@ function selectCategory(c?: StyleCategory) {
   category.value = c
   layout.value?.scrollToTop()
   loadWorks()
+}
+
+// 从分享卡片进来：?category= 定位分类，?workId= 直接打开那件作品
+let sharedWorkId: ID | undefined
+
+onLoad(query => {
+  const c = query?.category as StyleCategory | undefined
+  if (c && c in CATEGORY_LABEL) category.value = c
+  sharedWorkId = query?.workId || undefined
+})
+
+function openSharedWork() {
+  const w = sharedWorkId && works.value.find(x => x.id === sharedWorkId)
+  sharedWorkId = undefined
+  if (w) openSheet(w)
 }
 
 onShow(() => {
@@ -167,6 +184,23 @@ function closeSheet(immediate = false) {
   clearTimeout(tabBarTimer)
   tabBarTimer = setTimeout(() => uni.showTabBar({ animation: false, fail: noop }), immediate ? 0 : 300)
 }
+
+// 弹层开着就分享这件作品，否则分享当前分类
+onShareAppMessage(() => {
+  const w = sheetOn.value ? current.value : undefined
+  if (w) {
+    return {
+      title: `${w.title}｜化妆师 ${artistName(w.artistId)}`,
+      path: sharePath('/pages/works/index', { category: w.category, workId: w.id }),
+      imageUrl: shareImage(w.image),
+    }
+  }
+  const c = category.value
+  return {
+    title: c ? `${SHOP_NAME}的${CATEGORY_LABEL[c]}妆作品` : `${SHOP_NAME}的作品，都是来过的客人`,
+    path: sharePath('/pages/works/index', { category: c }),
+  }
+})
 
 function bookSame() {
   const w = current.value

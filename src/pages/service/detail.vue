@@ -59,9 +59,10 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
 import { api, errorText, type ID, type Service } from '@/api'
 import { formatPrice } from '@/utils/money'
+import { SHOP_NAME, shareImage, sharePath } from '@/utils/share'
 import { switchTab } from '@/utils/tab'
 import AppButton from '@/components/AppButton.vue'
 import ArchImage from '@/components/ArchImage.vue'
@@ -111,6 +112,16 @@ async function load() {
 onLoad(query => {
   serviceId = query?.id ?? ''
   load()
+})
+
+// 价格写在标题里：价格透明本来就是卖点。还没加载出来时退回门店名
+onShareAppMessage(() => {
+  const s = service.value
+  return {
+    title: s ? `${s.name}｜${formatPrice(s.price, { from: s.priceFrom })}，约 ${s.durationMin} 分钟` : SHOP_NAME,
+    path: sharePath('/pages/service/detail', { id: serviceId }),
+    imageUrl: shareImage(s?.cover),
+  }
 })
 
 function onSwipe(e: { detail: { current: number } }) {
