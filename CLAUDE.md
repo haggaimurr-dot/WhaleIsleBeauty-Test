@@ -74,7 +74,8 @@ src/
 ```
 
 `server/` 是 Go 后端（只用标准库 + MySQL 驱动），业务规则在 `app.go`，要和 `mock.ts` 的行为一致；改了契约时两边一起改。
-部署在云托管服务 `jingyu-api`，环境变量见 `server/main.go` 顶部注释。还没有商户号，`PAY_MODE=fake` 时由 `/v1/bookings/:id/fake-paid` 代替支付回调。
+部署在云托管服务 `jingyu-api`，环境变量见 `server/main.go` 顶部注释。还没有商户号，`PAY_MODE=fake` 时由 `/v1/bookings/:id/fake-paid` 代替支付回调，只有店主和 `FAKE_PAY_OPENIDS` 里的测试人员能用。`PAY_MODE` 没有默认值，不设服务起不来，防止假支付被带上线。
+表结构在 `server/migrations/`，启动时按文件名顺序执行没跑过的；已经执行过的文件不要改，改表结构加新文件。
 
 ## 数据规则（重要）
 

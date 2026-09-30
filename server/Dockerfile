@@ -5,6 +5,7 @@ ENV GOPROXY=https://goproxy.cn,direct CGO_ENABLED=0
 COPY go.mod go.sum ./
 RUN go mod download
 COPY *.go ./
+COPY migrations ./migrations
 RUN go build -trimpath -ldflags="-s -w" -o /out/server .
 
 FROM alpine:3.20

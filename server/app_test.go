@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -15,15 +18,21 @@ import (
 
 type clock struct{ t time.Time }
 
-func (c *clock) now() time.Time           { return c.t }
+func (c *clock) now() time.Time          { return c.t }
 func (c *clock) advance(d time.Duration) { c.t = c.t.Add(d) }
 
-const ownerOpenID = "o-owner"
+const (
+	ownerOpenID  = "o-owner"
+	testerOpenID = "o-alice" // FAKE_PAY_OPENIDS 里的测试人员
+)
 
 func newTestApp(t *testing.T) (*App, *clock) {
 	t.Helper()
 	c := &clock{t: time.Date(2026, 10, 1, 10, 0, 0, 0, shanghai)}
-	return &App{store: newMemStore(), now: c.now, owners: map[string]bool{ownerOpenID: true}, fakePay: true}, c
+	return &App{
+		store: newMemStore(), now: c.now, owners: map[string]bool{ownerOpenID: true},
+		fakePay: true, fakePayers: map[string]bool{ownerOpenID: true, testerOpenID: true},
+	}, c
 }
 
 func user(t *testing.T, a *App, openid string) *User {
@@ -356,7 +365,16 @@ func TestHTTP(t *testing.T) {
 	if code, _, body := do(t, h, "GET", "/v1/bookings/mine?scope=upcoming", "o-alice", ""); code != 200 || !strings.Contains(body, id) {
 		t.Fatalf("mine: %d %s", code, body)
 	}
-	if code, m, _ := do(t, h, "POST", "/v1/bookings/"+id+"/fake-paid", "o-alice", ""); code != 200 || m["status"] != StatusPendingConfirm {
+	// 假支付：不在名单里的客人不能用，免得不付钱就约上
+	code, m, _ = do(t, h, "POST", "/v1/bookings", "o-bob", `{"serviceId":"s1","artistId":"a1","date":"2026-10-03","time":"12:00"}`)
+	bobID := m["booking"].(map[string]any)["id"].(string)
+	if code, m, _ := do(t, h, "POST", "/v1/bookings/"+bobID+"/fake-paid", "o-bob", ""); code != 403 || m["code"] != "FORBIDDEN" {
+		t.Fatalf("不在名单里的 fake-paid: %d %v", code, m)
+	}
+	if code, m, _ := do(t, h, "GET", "/v1/bookings/"+bobID, "o-bob", ""); code != 200 || m["status"] != StatusPendingPayment {
+		t.Fatalf("被拒后应该还是待付定金: %d %v", code, m)
+	}
+	if code, m, _ := do(t, h, "POST", "/v1/bookings/"+id+"/fake-paid", testerOpenID, ""); code != 200 || m["status"] != StatusPendingConfirm {
 		t.Fatalf("fake-paid: %d %v", code, m)
 	}
 	if code, _, body := do(t, h, "GET", "/v1/bookings/mine?scope=past", "o-alice", ""); code != 200 || strings.TrimSpace(body) != "[]" {
@@ -370,5 +388,112 @@ func TestHTTP(t *testing.T) {
 	}
 	if code, m, _ := do(t, h, "GET", "/v1/nope", "o-alice", ""); code != 404 || m["code"] != "NOT_FOUND" {
 		t.Fatalf("404: %d %v", code, m)
+	}
+}
+
+// 可约日期以外的日子全部约满，和下单的检查一致
+func TestSlotsOutsideBookableDates(t *testing.T) {
+	a, _ := newTestApp(t) // 现在是 2026-10-01 10:00，可约 10-02 ~ 10-08
+	u := user(t, a, "o-carol")
+	for _, d := range []string{"2026-10-01", "2026-10-09", "2027-01-01"} {
+		slots, err := a.ListSlots(context.Background(), u, "a1", d, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, s := range slots {
+			if s.Available {
+				t.Fatalf("%s %s 不该可约", d, s.Time)
+			}
+		}
+	}
+	slots, _ := a.ListSlots(context.Background(), u, "a1", "2026-10-08", "")
+	if !slots[0].Available {
+		t.Fatal("第 7 天应该可约")
+	}
+}
+
+// 同一时段同时下单，只能有一个成功（内存存储靠锁，MySQL 靠 uk_active_slot）
+func TestConcurrentBooking(t *testing.T) {
+	a, _ := newTestApp(t)
+	users := make([]*User, 20)
+	for i := range users {
+		users[i] = user(t, a, fmt.Sprintf("o-c%d", i))
+	}
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	ok, taken := 0, 0
+	for _, u := range users {
+		wg.Add(1)
+		go func(u *User) {
+			defer wg.Done()
+			_, err := a.CreateBooking(context.Background(), u, CreateBookingReq{ServiceID: "s1", ArtistID: "a3", Date: "2026-10-04", Time: "18:00"})
+			mu.Lock()
+			defer mu.Unlock()
+			var ae *ApiError
+			switch {
+			case err == nil:
+				ok++
+			case errors.As(err, &ae) && ae.Code == "SLOT_TAKEN":
+				taken++
+			default:
+				t.Errorf("unexpected: %v", err)
+			}
+		}(u)
+	}
+	wg.Wait()
+	if ok != 1 || taken != 19 {
+		t.Fatalf("ok=%d taken=%d", ok, taken)
+	}
+}
+
+// 内存存储要和 MySQL 的唯一索引行为一致：本地测过的，线上也成立
+func TestMemStoreSlotUniqueness(t *testing.T) {
+	ctx := context.Background()
+	s := newMemStore()
+	b1 := &BookingRow{ID: "b1", ArtistID: "a1", Date: "2026-10-03", Time: "09:00", Status: StatusPendingPayment}
+	if err := s.InsertBooking(ctx, b1); err != nil {
+		t.Fatal(err)
+	}
+	b2 := &BookingRow{ID: "b2", ArtistID: "a1", Date: "2026-10-03", Time: "09:00", Status: StatusPendingPayment}
+	if err := s.InsertBooking(ctx, b2); !errors.Is(err, ErrSlotTaken) {
+		t.Fatalf("同一时段第二条: %v", err)
+	}
+	// 取消后时段放出来
+	c := *b1
+	c.Status = StatusCancelled
+	if err := s.UpdateBooking(ctx, &c, StatusPendingPayment); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.InsertBooking(ctx, b2); err != nil {
+		t.Fatalf("取消后应该能约: %v", err)
+	}
+	// 改期挪进别人占着的时段
+	b3 := &BookingRow{ID: "b3", ArtistID: "a1", Date: "2026-10-03", Time: "10:30", Status: StatusConfirmed}
+	if err := s.InsertBooking(ctx, b3); err != nil {
+		t.Fatal(err)
+	}
+	moved := *b3
+	moved.Time = "09:00"
+	if err := s.UpdateBooking(ctx, &moved, StatusConfirmed); !errors.Is(err, ErrSlotTaken) {
+		t.Fatalf("改期撞时段: %v", err)
+	}
+	// 状态已经被别的请求改了
+	if err := s.UpdateBooking(ctx, b3, StatusPendingConfirm); !errors.Is(err, ErrStale) {
+		t.Fatalf("状态对不上: %v", err)
+	}
+}
+
+// 建表脚本按文件名顺序执行；打包进了二进制
+func TestMigrationsEmbedded(t *testing.T) {
+	names, err := fs.Glob(migrationFS, "migrations/*.sql")
+	if err != nil || len(names) < 2 {
+		t.Fatalf("names=%v err=%v", names, err)
+	}
+	if names[0] != "migrations/001_init.sql" || names[1] != "migrations/002_active_slot_generated.sql" {
+		t.Fatalf("顺序不对: %v", names)
+	}
+	body, _ := fs.ReadFile(migrationFS, names[1])
+	if !strings.Contains(string(body), "STORED") || !strings.Contains(string(body), "uk_active_slot") {
+		t.Fatal("002 应该把 active_slot 改成生成列并加唯一索引")
 	}
 }

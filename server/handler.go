@@ -166,7 +166,7 @@ func (a *App) Routes() http.Handler {
 	if a.fakePay {
 		// 联调用：代替微信支付回调。不在契约里，接真支付后去掉
 		h("POST /v1/bookings/{id}/fake-paid", func(w http.ResponseWriter, r *http.Request) {
-			v, err := a.MarkPaid(r.Context(), userOf(r), r.PathValue("id"))
+			v, err := a.FakePaid(r.Context(), userOf(r), r.PathValue("id"))
 			reply(w, r, v, err)
 		})
 	}

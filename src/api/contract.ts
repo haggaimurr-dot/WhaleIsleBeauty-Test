@@ -82,7 +82,7 @@ export interface Api {
   resumePayment(id: ID): Promise<CreateBookingResp>
   /** POST /bookings/:id/cancel  距离开始不足 24 小时返回 CANCEL_TOO_LATE（pending_payment 不受限制） */
   cancelBooking(id: ID): Promise<Booking>
-  /** POST /bookings/:id/reschedule  同样受 24 小时规则限制，改期后回到 pending_confirm。到店提醒按新时间发 */
+  /** POST /bookings/:id/reschedule  同样受 24 小时规则限制，改期后回到 pending_confirm（还没付定金的仍是 pending_payment）。到店提醒按新时间发 */
   rescheduleBooking(id: ID, req: RescheduleReq): Promise<Booking>
 
   // 自动取消（后端定时任务，没有接口）：

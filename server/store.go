@@ -106,7 +106,7 @@ func newMemStore() *memStore {
 }
 
 func cloneBooking(b *BookingRow) *BookingRow { c := *b; return &c }
-func cloneUser(u *User) *User               { c := *u; return &c }
+func cloneUser(u *User) *User                { c := *u; return &c }
 
 func (s *memStore) UserByOpenID(_ context.Context, openid string) (*User, error) {
 	s.mu.Lock()

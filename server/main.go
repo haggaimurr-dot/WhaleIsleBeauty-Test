@@ -8,7 +8,11 @@
 //	MYSQL_DATABASE  库名，默认 jingyu，不存在会自动创建
 //	STORE=memory    不连数据库，数据放内存（本地开发用，重启就没了）
 //	OWNER_OPENIDS   店主的 openid，多个用逗号分隔
-//	PAY_MODE        fake（默认，还没有商户号）或 wxpay
+//	PAY_MODE        必须显式设置。fake：还没有商户号时联调用，不收钱；wxpay：微信支付（还没实现）
+//	FAKE_PAY_OPENIDS  PAY_MODE=fake 时，除店主外还能用假支付的测试人员 openid，逗号分隔
+//
+// 假支付会让预约不付钱就变成“已付定金”，正式开放给客人之前必须换成 wxpay。
+// 为了防止忘记，PAY_MODE 没有默认值；fake 模式下也只有店主和 FAKE_PAY_OPENIDS 里的人能用。
 package main
 
 import (
@@ -44,18 +48,23 @@ func main() {
 		store = s
 	}
 
-	owners := map[string]bool{}
-	for _, id := range strings.Split(os.Getenv("OWNER_OPENIDS"), ",") {
-		if id = strings.TrimSpace(id); id != "" {
-			owners[id] = true
-		}
-	}
-	payMode := env("PAY_MODE", "fake")
-	if payMode != "fake" {
+	owners := openIDSet(os.Getenv("OWNER_OPENIDS"))
+	payMode := os.Getenv("PAY_MODE")
+	switch payMode {
+	case "fake":
+		log.Print("PAY_MODE=fake：假支付，不收钱。正式开放给客人前必须换成微信支付")
+	case "":
+		log.Fatal("没有设置 PAY_MODE。还没有商户号时设 PAY_MODE=fake 联调；正式上线要接微信支付")
+	default:
 		log.Fatalf("PAY_MODE=%s 还没实现，现在只支持 fake", payMode)
 	}
+	// 能用假支付的人：店主 + 测试人员
+	fakePayers := openIDSet(os.Getenv("FAKE_PAY_OPENIDS"))
+	for id := range owners {
+		fakePayers[id] = true
+	}
 
-	app := &App{store: store, now: time.Now, owners: owners, fakePay: true}
+	app := &App{store: store, now: time.Now, owners: owners, fakePay: true, fakePayers: fakePayers}
 
 	// 实例活着的时候每分钟也流转一次；每个请求前还会再跑一次
 	go func() {
@@ -67,9 +76,20 @@ func main() {
 	}()
 
 	addr := ":" + env("PORT", "80")
-	log.Printf("listening on %s, owners=%d, pay=%s", addr, len(owners), payMode)
+	log.Printf("listening on %s, owners=%d, pay=%s, fakePayers=%d", addr, len(owners), payMode, len(fakePayers))
 	srv := &http.Server{Addr: addr, Handler: logRequests(app.Routes()), ReadHeaderTimeout: 10 * time.Second}
 	log.Fatal(srv.ListenAndServe())
+}
+
+// openIDSet 解析逗号分隔的 openid
+func openIDSet(s string) map[string]bool {
+	out := map[string]bool{}
+	for _, id := range strings.Split(s, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			out[id] = true
+		}
+	}
+	return out
 }
 
 // logRequests 打一行访问日志，带上 openid，方便在云托管日志里找到店主的 openid

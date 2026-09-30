@@ -76,6 +76,8 @@ type App struct {
 	now     func() time.Time
 	owners  map[string]bool // 店主的 openid
 	fakePay bool            // 还没有商户号：不调微信支付，由 /fake-paid 模拟回调
+	// fakePayers 能调 /fake-paid 的 openid（店主 + 测试人员）。别的客人调会被拒绝，防止不付钱就约上
+	fakePayers map[string]bool
 }
 
 func newID(prefix string) string {
@@ -265,6 +267,14 @@ func (a *App) ListSlots(ctx context.Context, u *User, artistID, date, excludeID 
 	if !validDate(date) {
 		return nil, badRequest("日期格式不对")
 	}
+	// 可约日期以外的日子全部显示约满，和下单时的检查一致
+	if !a.bookable(date) {
+		out := make([]SlotView, len(slotTimes))
+		for i, t := range slotTimes {
+			out[i] = SlotView{Time: t}
+		}
+		return out, nil
+	}
 	// 改期时正在改的那条：必须是自己的、还在进行中，否则忽略
 	if excludeID != "" {
 		b, err := a.store.Booking(ctx, excludeID)
@@ -425,7 +435,15 @@ func (a *App) ResumePayment(ctx context.Context, u *User, id string) (CreateBook
 	return CreateBookingResp{Booking: a.out(b), Payment: a.payParams(b)}, nil
 }
 
-// MarkPaid 支付回调：待付定金 → 等待店里确认。假支付模式下由 /fake-paid 调用
+// FakePaid 假支付：只有店主和测试人员能用，其他客人返回 FORBIDDEN
+func (a *App) FakePaid(ctx context.Context, u *User, id string) (Booking, error) {
+	if !a.fakePay || !a.fakePayers[u.OpenID] {
+		return Booking{}, apiErr("FORBIDDEN", "现在还不能在线付定金，请联系门店预约")
+	}
+	return a.MarkPaid(ctx, u, id)
+}
+
+// MarkPaid 支付回调：待付定金 → 等待店里确认。假支付模式下由 FakePaid 调用
 func (a *App) MarkPaid(ctx context.Context, u *User, id string) (Booking, error) {
 	b, err := a.myBooking(ctx, u, id)
 	if err != nil {

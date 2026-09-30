@@ -5,69 +5,18 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
+	"log"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
 )
 
-// MySQL 实现。时间一律按 UTC 存 DATETIME。
-// “同一时段只能有一个进行中的预约”靠 active_slot 唯一索引保证：进行中时写 artist|date|time，结束后置 NULL。
-
-const schema = `
-CREATE TABLE IF NOT EXISTS users (
-  id              VARCHAR(32)  NOT NULL PRIMARY KEY,
-  openid          VARCHAR(64)  NOT NULL,
-  nickname        VARCHAR(64)  NOT NULL,
-  avatar          VARCHAR(255) NOT NULL,
-  skin_type       VARCHAR(20)  NOT NULL DEFAULT '',
-  tone            VARCHAR(20)  NOT NULL DEFAULT '',
-  allergies       VARCHAR(1000) NOT NULL DEFAULT '',
-  skin_note       VARCHAR(1000) NOT NULL DEFAULT '',
-  skin_updated_at DATETIME NULL,
-  created_at      DATETIME NOT NULL,
-  UNIQUE KEY uk_openid (openid)
-) DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS bookings (
-  id            VARCHAR(32)  NOT NULL PRIMARY KEY,
-  user_id       VARCHAR(32)  NOT NULL,
-  service_id    VARCHAR(32)  NOT NULL,
-  service_name  VARCHAR(64)  NOT NULL,
-  artist_id     VARCHAR(32)  NOT NULL,
-  artist_name   VARCHAR(64)  NOT NULL,
-  date          CHAR(10)     NOT NULL,
-  time          CHAR(5)      NOT NULL,
-  start_at      DATETIME     NOT NULL,
-  end_at        DATETIME     NOT NULL,
-  duration_min  INT          NOT NULL,
-  price         INT          NOT NULL,
-  deposit       INT          NOT NULL,
-  status        VARCHAR(20)  NOT NULL,
-  occasion      VARCHAR(20)  NOT NULL DEFAULT '',
-  skin_type     VARCHAR(20)  NOT NULL DEFAULT '',
-  note          VARCHAR(1000) NOT NULL DEFAULT '',
-  created_at    DATETIME     NOT NULL,
-  pay_deadline  DATETIME NULL,
-  paid_at       DATETIME NULL,
-  refunded_at   DATETIME NULL,
-  cancel_reason VARCHAR(20)  NOT NULL DEFAULT '',
-  active_slot   VARCHAR(64) NULL,
-  UNIQUE KEY uk_active_slot (active_slot),
-  KEY idx_user (user_id),
-  KEY idx_date (date),
-  KEY idx_status_start (status, start_at)
-) DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS blocks (
-  slot_key   VARCHAR(64) NOT NULL PRIMARY KEY,
-  artist_id  VARCHAR(32) NOT NULL,
-  date       CHAR(10)    NOT NULL,
-  time       CHAR(5)     NOT NULL,
-  created_at DATETIME    NOT NULL,
-  KEY idx_date (date)
-) DEFAULT CHARSET=utf8mb4;
-`
+// MySQL 实现。时间一律按 UTC 存 DATETIME。表结构在 migrations/ 里，启动时自动执行没跑过的。
+// “同一时段只能有一个进行中的预约”靠 active_slot 唯一索引保证：它是生成列（见 002），
+// 进行中时由数据库算出 artist|date|time，结束后为 NULL。代码里不要写这一列。
 
 type mysqlStore struct{ db *sql.DB }
 
@@ -97,11 +46,48 @@ func openMySQL(addr, user, pass, dbName string) (*mysqlStore, error) {
 	}
 	db.SetMaxOpenConns(10)
 	db.SetConnMaxLifetime(5 * time.Minute)
-	if _, err := db.Exec(schema); err != nil {
+	if err := migrate(db, migrationFS); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("create tables: %w", err)
+		return nil, err
 	}
 	return &mysqlStore{db: db}, nil
+}
+
+// migrate 按文件名顺序执行 migrations/*.sql 里还没跑过的，每个文件只执行一次
+func migrate(db *sql.DB, files fs.FS) error {
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+		version    VARCHAR(128) NOT NULL PRIMARY KEY,
+		applied_at DATETIME     NOT NULL
+	) DEFAULT CHARSET=utf8mb4`); err != nil {
+		return fmt.Errorf("create schema_migrations: %w", err)
+	}
+	names, err := fs.Glob(files, "migrations/*.sql")
+	if err != nil {
+		return err
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		var n int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version = ?`, name).Scan(&n); err != nil {
+			return err
+		}
+		if n > 0 {
+			continue
+		}
+		body, err := fs.ReadFile(files, name)
+		if err != nil {
+			return err
+		}
+		// MySQL 的 DDL 会隐式提交，没法整体回滚：某个文件失败就停下，修好后重新部署会从这个文件继续
+		if _, err := db.Exec(string(body)); err != nil {
+			return fmt.Errorf("执行 %s 失败: %w", name, err)
+		}
+		if _, err := db.Exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, name, time.Now().UTC()); err != nil {
+			return err
+		}
+		log.Printf("migration applied: %s", name)
+	}
+	return nil
 }
 
 func isDuplicate(err error) bool {
@@ -122,13 +108,6 @@ func timePtr(n sql.NullTime) *time.Time {
 	}
 	t := n.Time
 	return &t
-}
-
-func activeSlot(b *BookingRow) sql.NullString {
-	if !isActive(b.Status) {
-		return sql.NullString{}
-	}
-	return sql.NullString{String: slotKey(b.ArtistID, b.Date, b.Time), Valid: true}
 }
 
 func placeholders(n int) string { return strings.TrimSuffix(strings.Repeat("?,", n), ",") }
@@ -251,12 +230,11 @@ func (s *mysqlStore) queryBookings(ctx context.Context, where string, args ...an
 }
 
 func (s *mysqlStore) InsertBooking(ctx context.Context, b *BookingRow) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO bookings (`+bookingCols+`, active_slot)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	_, err := s.db.ExecContext(ctx, `INSERT INTO bookings (`+bookingCols+`)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		b.ID, b.UserID, b.ServiceID, b.ServiceName, b.ArtistID, b.ArtistName, b.Date, b.Time,
 		b.StartAt.UTC(), b.EndAt.UTC(), b.DurationMin, b.Price, b.Deposit, b.Status, b.Occasion, b.SkinType, b.Note,
-		b.CreatedAt.UTC(), nullTime(b.PayDeadline), nullTime(b.PaidAt), nullTime(b.RefundedAt), b.CancelReason,
-		activeSlot(b))
+		b.CreatedAt.UTC(), nullTime(b.PayDeadline), nullTime(b.PaidAt), nullTime(b.RefundedAt), b.CancelReason)
 	if isDuplicate(err) {
 		return ErrSlotTaken
 	}
@@ -274,10 +252,10 @@ func (s *mysqlStore) Booking(ctx context.Context, id string) (*BookingRow, error
 func (s *mysqlStore) UpdateBooking(ctx context.Context, b *BookingRow, from string) error {
 	res, err := s.db.ExecContext(ctx, `UPDATE bookings SET
 		artist_id = ?, artist_name = ?, date = ?, time = ?, start_at = ?, end_at = ?, status = ?,
-		pay_deadline = ?, paid_at = ?, refunded_at = ?, cancel_reason = ?, active_slot = ?
+		pay_deadline = ?, paid_at = ?, refunded_at = ?, cancel_reason = ?
 		WHERE id = ? AND status = ?`,
 		b.ArtistID, b.ArtistName, b.Date, b.Time, b.StartAt.UTC(), b.EndAt.UTC(), b.Status,
-		nullTime(b.PayDeadline), nullTime(b.PaidAt), nullTime(b.RefundedAt), b.CancelReason, activeSlot(b),
+		nullTime(b.PayDeadline), nullTime(b.PaidAt), nullTime(b.RefundedAt), b.CancelReason,
 		b.ID, from)
 	if isDuplicate(err) {
 		return ErrSlotTaken

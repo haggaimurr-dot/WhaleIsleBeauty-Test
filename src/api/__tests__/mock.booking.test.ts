@@ -96,6 +96,16 @@ describe('取消和改期', () => {
     expect(others.find(s => s.time === time)?.available).toBe(false)
   })
 
+  it('还没付定金的预约改期后仍是待付定金，不会绕过付款', async () => {
+    const date = await day(3)
+    const t1 = await freeSlot('a1', date)
+    const { booking } = await api.createBooking({ serviceId: 's1', artistId: 'a1', date, time: t1 })
+    const t2 = await freeSlot('a1', date, [t1])
+    const moved = await api.rescheduleBooking(booking.id, { artistId: 'a1', date, time: t2 })
+    expect(moved).toMatchObject({ time: t2, status: 'pending_payment' })
+    expect(moved.payDeadline).toBe(booking.payDeadline)
+  })
+
   it('改期后回到等待确认；改到约满的时段报 SLOT_TAKEN', async () => {
     const date = await day(3)
     const t1 = await freeSlot('a1', date)
