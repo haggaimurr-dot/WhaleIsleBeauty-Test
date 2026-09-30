@@ -54,7 +54,7 @@
             <template v-else-if="c.state === 'past'">已过</template>
             <template v-else-if="c.booking">
               <text>{{ c.booking.customerName }}</text>
-              <text class="cell__sub" :class="{ 'cell__sub--alert': c.state === 'booked' && c.booking.alert }">
+              <text class="cell__sub" :class="{ 'cell__sub--alert': c.state === 'booked' && c.booking.alert && c.booking.status !== 'pending_payment' }">
                 {{ cellSub(c) }}
               </text>
             </template>
@@ -127,6 +127,7 @@ function cellSub(c: ScheduleCell) {
   const b = c.booking
   if (!b) return ''
   if (c.state === 'pending') return b.canConfirm ? '待确认' : '已过时，未确认'
+  if (b.status === 'pending_payment') return '待付定金'
   if (cellTone(c) === 'ok') return '已确认'
   return b.alert ?? b.serviceName
 }
@@ -207,6 +208,7 @@ function tapCell(c: ScheduleCell) {
     case 'booked': {
       const b = c.booking
       if (!b) return
+      if (b.status === 'pending_payment') return toast(`${b.customerName} 刚下单，还没付定金。15 分钟内没付会自动放出来`)
       const extra = [b.alert, b.note && `备注：${b.note}`].filter(Boolean).join('，')
       return toast([b.customerName, b.serviceName, extra].filter(Boolean).join('　'))
     }
