@@ -44,6 +44,7 @@
  * 选化妆师、日期、时间。预约页和改期页共用。
  * 可约时段由组件自己按 (serviceId, artistId, date) 拉取；换化妆师或日期时清空已选时间。
  * 用法：<SlotPicker ref="picker" :service-id v-model:artist-id v-model:date v-model:time :artists :dates />
+ * 改期时传 exclude-booking-id，客人自己原来的时段不会显示成约满。
  */
 import { ref, watch } from 'vue'
 import { api, errorText, type Artist, type DateStr, type ID, type SlotView, type TimeStr } from '@/api'
@@ -54,6 +55,8 @@ defineOptions({ options: { virtualHost: true } })
 
 const props = defineProps<{
   serviceId?: ID
+  /** 改期中的预约 id */
+  excludeBookingId?: ID
   artists: Artist[]
   dates: DateStr[]
   artistId?: ID
@@ -92,13 +95,13 @@ const slotsError = ref('')
 let seq = 0
 
 async function refresh() {
-  const { serviceId, artistId, date } = props
+  const { serviceId, artistId, date, excludeBookingId } = props
   if (!serviceId || !artistId || !date) return
   const mine = ++seq
   slots.value = []
   slotsError.value = ''
   try {
-    const list = await api.listSlots(artistId, date, serviceId)
+    const list = await api.listSlots(artistId, date, serviceId, excludeBookingId)
     if (mine !== seq) return
     slots.value = list
     // 已选的时间刚被约走了，清掉
@@ -109,7 +112,7 @@ async function refresh() {
   }
 }
 
-watch(() => [props.serviceId, props.artistId, props.date], refresh, { immediate: true })
+watch(() => [props.serviceId, props.artistId, props.date, props.excludeBookingId], refresh, { immediate: true })
 
 /** 提交时遇到 SLOT_TAKEN，父组件调用它重新拉取 */
 defineExpose({ refresh })

@@ -129,7 +129,7 @@ const past = ref<Booking[]>([])
 const status = ref<'loading' | 'ok' | 'error'>('loading')
 const errorMsg = ref('')
 
-/** visitCount 是已经来过的次数，“这一次”算下一次 */
+/** visitCount 是已完成到店的次数（见 types.ts），“这一次”算下一次 */
 const visitText = computed(() => {
   const n = (me.value?.visitCount ?? 0) + 1
   return n === 1 ? '第一次来鲸屿，欢迎' : `这是你第 ${n} 次来鲸屿`

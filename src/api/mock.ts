@@ -8,7 +8,7 @@ import {
   type DateStr, type DaySchedule, type ID, type Me, type OwnerBookingBrief,
   type ScheduleCell, type Service, type Shop, type SlotView, type TimeStr, type Work,
 } from './types'
-import { upcomingDates, toTimestamp, hoursUntil, todayStr, nowTimeStr } from '../utils/date'
+import { upcomingDates, datesFromToday, toTimestamp, hoursUntil, todayStr, nowTimeStr } from '../utils/date'
 
 // ---------- 种子数据 ----------
 
@@ -69,7 +69,7 @@ const shop: Shop = {
 }
 
 /** 演示时同一个人既是客人也是店主，方便一台手机走完整流程。改成 'customer' 可隐藏店主入口 */
-const me: Me = { id: 'u1', nickname: '阿柚', avatar: 'placeholder:g4', role: 'owner', visitCount: 3, skinProfile: '敏感肌 · 冷白皮' }
+const me: Me = { id: 'u1', nickname: '阿柚', avatar: 'placeholder:g4', role: 'owner', visitCount: 0, skinProfile: '敏感肌 · 冷白皮' }
 
 const OTHER_NAMES = ['林小姐', '陈小姐', '周小姐', '许小姐', '黄小姐', '吴小姐', '郑小姐', '何小姐']
 const OTHER_SERVICES = ['上镜妆', '约会妆', '新娘试妆', '主持妆', '面试妆']
@@ -138,6 +138,11 @@ function out(b: Booking): Booking {
   return c
 }
 
+/** visitCount 按契约由预约记录算出：completed 的条数 */
+function outMe(): Me {
+  return { ...clone(me), visitCount: bookings.filter(b => b.status === 'completed').length }
+}
+
 function requireOwner() {
   if (me.role !== 'owner') throw new ApiError('FORBIDDEN', '只有店主可以进行这个操作')
 }
@@ -152,8 +157,8 @@ export async function __simulatePaid(id: ID) {
 // ---------- 实现 ----------
 
 export const mockApi: Api = {
-  async login() { await delay(); return clone(me) },
-  async getMe() { await delay(100); return clone(me) },
+  async login() { await delay(); return outMe() },
+  async getMe() { await delay(100); return outMe() },
 
   async listArtists() { await delay(); return clone(artists) },
   async listServices() { await delay(); return clone(services) },
@@ -165,9 +170,11 @@ export const mockApi: Api = {
   async listBookableDates() { await delay(100); return upcomingDates(7) },
   async getShop() { await delay(100); return clone(shop) },
 
-  async listSlots(artistId, date, _serviceId): Promise<SlotView[]> {
+  async listSlots(artistId, date, _serviceId, excludeBookingId): Promise<SlotView[]> {
     await delay()
-    return TIMES.map(time => ({ time, available: isAvailable(artistId, date, time) }))
+    // 只认还在进行中的预约；mock 里只有一个用户，不用再校验归属
+    const exclude = bookings.find(b => b.id === excludeBookingId && ACTIVE.includes(b.status))?.id
+    return TIMES.map(time => ({ time, available: isAvailable(artistId, date, time, exclude) }))
   },
 
   async createBooking(req: CreateBookingReq) {
@@ -233,11 +240,17 @@ export const mockApi: Api = {
     return out(b)
   },
 
+  async listScheduleDates() {
+    await delay(100)
+    requireOwner()
+    return datesFromToday(8)
+  },
+
   async getDaySchedule(date): Promise<DaySchedule> {
     await delay()
     requireOwner()
     const cells: ScheduleCell[] = []
-    const stats = { total: 0, pending: 0, free: 0 }
+    const stats = { total: 0, pending: 0, free: 0, stale: 0 }
     for (const time of TIMES) {
       for (const a of artists) {
         const cell: ScheduleCell = { artistId: a.id, time, state: 'free' }
@@ -246,6 +259,7 @@ export const mockApi: Api = {
           const brief: OwnerBookingBrief = {
             id: real.id, customerName: me.nickname, serviceName: real.serviceName, status: real.status,
             alert: real.skinType === 'sensitive' ? '敏感肌' : undefined, note: real.note,
+            canConfirm: real.status === 'pending_confirm' && !isPast(real.date, real.time),
           }
           cell.state = real.status === 'pending_confirm' ? 'pending' : 'booked'
           cell.booking = brief
@@ -257,12 +271,16 @@ export const mockApi: Api = {
             id: `other-${h}`, customerName: OTHER_NAMES[h % OTHER_NAMES.length],
             serviceName: OTHER_SERVICES[h % OTHER_SERVICES.length], status: 'confirmed',
             alert: sensitive ? '敏感肌' : undefined, note: sensitive ? '对酒精过敏' : undefined,
+            canConfirm: false,
           }
+        } else if (isPast(date, time)) {
+          cell.state = 'past'
         } else if (blocks.has(slotKey(a.id, date, time))) {
           cell.state = 'blocked'
         }
         if (cell.state === 'booked' || cell.state === 'pending') stats.total++
         if (cell.state === 'pending') stats.pending++
+        if (cell.state === 'pending' && !cell.booking?.canConfirm) stats.stale++
         if (cell.state === 'free') stats.free++
         cells.push(cell)
       }
@@ -275,6 +293,7 @@ export const mockApi: Api = {
     requireOwner()
     const b = getOrThrow(bookings, id)
     if (b.status !== 'pending_confirm') throw new ApiError('INVALID_STATE', '这个预约已经处理过了')
+    if (isPast(b.date, b.time)) throw new ApiError('INVALID_STATE', '预约时间已经过了，不能再确认')
     b.status = 'confirmed'
     return out(b)
   },
@@ -282,6 +301,7 @@ export const mockApi: Api = {
   async blockSlot(artistId, date, time) {
     await delay(200)
     requireOwner()
+    if (isPast(date, time)) throw new ApiError('INVALID_STATE', '这个时段已经过去了')
     if (findActive(artistId, date, time) || takenByOthers(artistId, date, time)) {
       throw new ApiError('INVALID_STATE', '这个时段已经有预约了')
     }
@@ -291,6 +311,7 @@ export const mockApi: Api = {
   async unblockSlot(artistId, date, time) {
     await delay(200)
     requireOwner()
+    if (isPast(date, time)) throw new ApiError('INVALID_STATE', '这个时段已经过去了')
     blocks.delete(slotKey(artistId, date, time))
   },
 }

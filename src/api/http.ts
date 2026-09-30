@@ -52,13 +52,15 @@ export const httpApi: Api = {
   listBookableDates: () => request('GET', '/dates'),
   getShop: () => request('GET', '/shop'),
 
-  listSlots: (artistId, date, serviceId) => request('GET', '/slots' + qs({ artistId, date, serviceId })),
+  listSlots: (artistId, date, serviceId, excludeBookingId) =>
+    request('GET', '/slots' + qs({ artistId, date, serviceId, excludeBookingId })),
   createBooking: (req) => request('POST', '/bookings', req),
   getBooking: (id) => request('GET', `/bookings/${id}`),
   listMyBookings: (scope) => request('GET', '/bookings/mine' + qs({ scope })),
   cancelBooking: (id) => request('POST', `/bookings/${id}/cancel`),
   rescheduleBooking: (id, req) => request('POST', `/bookings/${id}/reschedule`, req),
 
+  listScheduleDates: () => request('GET', '/owner/dates'),
   getDaySchedule: (date) => request('GET', '/owner/schedule' + qs({ date })),
   confirmBooking: (id) => request('POST', `/owner/bookings/${id}/confirm`),
   blockSlot: (artistId, date, time) => request('PUT', '/owner/blocks', { artistId, date, time }),

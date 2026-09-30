@@ -47,7 +47,7 @@
     <view
       class="sheet-mask"
       :class="{ 'sheet-mask--on': sheetOn }"
-      @tap="closeSheet"
+      @tap="closeSheet()"
       @touchmove.stop.prevent
     />
     <view v-if="current" class="sheet" :class="{ 'sheet--on': sheetOn }" @touchmove.stop.prevent>
@@ -57,7 +57,7 @@
       <view class="sheet__desc">化妆师 {{ artistName(current.artistId) }}　{{ current.durationText }}</view>
       <view class="sheet__desc sheet__desc--last">喜欢这个效果，可以直接约同一位化妆师</view>
       <view class="sheet__row">
-        <AppButton variant="ghost" class="sheet__btn" @click="closeSheet">再看看</AppButton>
+        <AppButton variant="ghost" class="sheet__btn" @click="closeSheet()">再看看</AppButton>
         <AppButton class="sheet__btn" @click="bookSame">预约同款</AppButton>
       </view>
     </view>
@@ -149,20 +149,29 @@ onShow(() => {
 const current = ref<Work>()
 const sheetOn = ref(false)
 
+// 原生 tabBar 在页面之上，遮罩盖不住它，弹层打开期间先把它藏起来
+const noop = () => {}
+let tabBarTimer: ReturnType<typeof setTimeout> | undefined
+
 function openSheet(w: Work) {
+  clearTimeout(tabBarTimer)
   current.value = w
+  uni.hideTabBar({ animation: false, fail: noop })
   // 先渲染到屏幕外，下一帧再加 --on，transform 过渡才会生效
   setTimeout(() => { sheetOn.value = true }, 20)
 }
 
-function closeSheet() {
+/** 等弹层滑出（0.3s）再放出 tabBar，避免页面高度变化时弹层跳一下；离开页面时立即放出 */
+function closeSheet(immediate = false) {
   sheetOn.value = false
+  clearTimeout(tabBarTimer)
+  tabBarTimer = setTimeout(() => uni.showTabBar({ animation: false, fail: noop }), immediate ? 0 : 300)
 }
 
 function bookSame() {
   const w = current.value
   if (!w) return
-  closeSheet()
+  closeSheet(true)
   switchTab('booking', { artistId: w.artistId, serviceId: w.serviceId })
 }
 </script>

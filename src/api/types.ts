@@ -87,6 +87,10 @@ export interface Me {
   nickname: string
   avatar: string
   role: Role
+  /**
+   * 已到店完成的次数：该用户状态为 completed 的预约数。
+   * 不含已取消、待付定金和还没到的预约。前端显示“第 visitCount + 1 次来”。
+   */
   visitCount: number
   /** 客人自己填写的档案，二期功能 */
   skinProfile?: string
@@ -183,8 +187,12 @@ export interface RescheduleReq {
 
 // ---------- 排班（店主端） ----------
 
-/** 对应排班网格里格子的四种状态 */
-export type SlotState = 'free' | 'booked' | 'pending' | 'blocked'
+/**
+ * 对应排班网格里格子的状态。
+ * past：开始时间已过且没有预约的格子（原来空闲或休息都算），不能再设休息或恢复可约，也不计入 stats.free。
+ * 已过去但有预约的格子仍按 booked / pending 返回，方便店主查看。
+ */
+export type SlotState = 'free' | 'booked' | 'pending' | 'blocked' | 'past'
 
 export interface OwnerBookingBrief {
   id: ID
@@ -194,6 +202,8 @@ export interface OwnerBookingBrief {
   /** 需要化妆师提前注意的事项，例如“敏感肌” */
   alert?: string
   note?: string
+  /** 服务端计算：pending_confirm 且开始时间还没到才为 true，前端据此决定是否显示“确认” */
+  canConfirm: boolean
 }
 
 export interface ScheduleCell {
@@ -213,6 +223,8 @@ export interface DaySchedule {
     total: number
     pending: number
     free: number
+    /** pending 里开始时间已过、不能再确认的个数（canConfirm 为 false），是 pending 的子集 */
+    stale: number
   }
 }
 

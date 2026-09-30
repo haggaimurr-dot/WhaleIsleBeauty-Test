@@ -34,8 +34,12 @@ export interface Api {
   getShop(): Promise<Shop>
 
   // ---------- 预约（客人端） ----------
-  /** GET /slots?artistId=&date=&serviceId= */
-  listSlots(artistId: ID, date: DateStr, serviceId: ID): Promise<SlotView[]>
+  /**
+   * GET /slots?artistId=&date=&serviceId=&excludeBookingId=
+   * excludeBookingId：改期时传入正在改的预约，它自己占着的时段按可约返回。
+   * 后端需校验该预约属于当前用户且未结束，否则忽略这个参数。
+   */
+  listSlots(artistId: ID, date: DateStr, serviceId: ID, excludeBookingId?: ID): Promise<SlotView[]>
   /**
    * POST /bookings
    * 后端需保证同一 (artistId, date, time) 不会被重复预约，冲突返回 409 SLOT_TAKEN
@@ -51,12 +55,14 @@ export interface Api {
   rescheduleBooking(id: ID, req: RescheduleReq): Promise<Booking>
 
   // ---------- 排班（店主端，需要 owner 角色） ----------
+  /** GET /owner/dates  排班可查看的日期（从今天起），和客人端的 /dates 不同，包含今天 */
+  listScheduleDates(): Promise<DateStr[]>
   /** GET /owner/schedule?date= */
   getDaySchedule(date: DateStr): Promise<DaySchedule>
-  /** POST /owner/bookings/:id/confirm  确认后给客人发订阅消息 */
+  /** POST /owner/bookings/:id/confirm  确认后给客人发订阅消息。开始时间已过返回 INVALID_STATE */
   confirmBooking(id: ID): Promise<Booking>
-  /** PUT /owner/blocks  body: { artistId, date, time } */
+  /** PUT /owner/blocks  body: { artistId, date, time }  时段已过去或已有预约返回 INVALID_STATE */
   blockSlot(artistId: ID, date: DateStr, time: TimeStr): Promise<void>
-  /** DELETE /owner/blocks  body: { artistId, date, time } */
+  /** DELETE /owner/blocks  body: { artistId, date, time }  时段已过去返回 INVALID_STATE */
   unblockSlot(artistId: ID, date: DateStr, time: TimeStr): Promise<void>
 }
