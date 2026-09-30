@@ -9,15 +9,20 @@ import type {
  * 注释里是对应的 REST 路径，Go 后端按这个实现。
  *
  * 约定：
+ * - 部署在微信云托管，所有路径挂在 /v1 下（例如 GET /v1/me）
  * - 成功：HTTP 2xx，body 直接是返回数据（不包 {code, data} 信封）
  * - 失败：HTTP 4xx/5xx，body 为 { "code": ErrorCode, "message": string }
- * - 鉴权：Header `Authorization: Bearer <token>`，token 由 /auth/wx-login 换取
+ * - 鉴权：云托管网关会带上请求头 X-WX-OPENID（以及 X-WX-UNIONID 等），后端以 openid 识别客人，不需要 token。
+ *   如果以后改为自有域名部署，才用 Header `Authorization: Bearer <token>`，token 由 /auth/wx-login 换取
+ * - 微信支付下单、发订阅消息用云托管的开放接口服务调用，不需要自己管理 access_token 和支付证书
  */
 export interface Api {
   // ---------- 登录 ----------
   /**
-   * POST /auth/wx-login  body: { code }  →  { token, me }，前端缓存 token
-   * 其他接口 token 过期或无效时返回 401 UNAUTHORIZED，前端会重新登录并重试一次原请求
+   * POST /auth/wx-login
+   * - 云托管：body 为 {}，后端按 X-WX-OPENID 找到或创建用户，返回 { me }（可以不带 token）
+   * - 自有域名：body 为 { code }，返回 { token, me }，前端缓存 token
+   * 其他接口认不出客人时返回 401 UNAUTHORIZED，前端会重新登录并重试一次原请求
    */
   login(): Promise<Me>
   /** GET /me */

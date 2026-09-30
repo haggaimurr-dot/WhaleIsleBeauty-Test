@@ -1,77 +1,129 @@
 <template>
-  <PageLayout ref="layout">
-    <template #header>
-      <view class="ohead">
-        <text class="ohead__title">排班</text>
-        <text class="ohead__date">{{ dateText }}</text>
+  <view>
+    <PageLayout ref="layout">
+      <template #header>
+        <view class="ohead">
+          <text class="ohead__title">排班</text>
+          <text class="ohead__date">{{ dateText }}</text>
+        </view>
+
+        <template v-if="!forbidden">
+          <view class="stats">
+            <view class="stats__item"><text class="stats__num">{{ schedule?.stats.total ?? '–' }}</text>当天预约</view>
+            <view class="stats__item">
+              <text class="stats__num">{{ schedule ? schedule.stats.pending - schedule.stats.stale : '–' }}</text>待确认
+              <text v-if="schedule?.stats.stale" class="stats__extra">另有 {{ schedule.stats.stale }} 个已过时</text>
+            </view>
+            <view class="stats__item"><text class="stats__num">{{ schedule?.stats.free ?? '–' }}</text>空闲时段</view>
+          </view>
+          <view class="days">
+            <DayPicker :model-value="date" :dates="dates" @update:model-value="changeDate" />
+          </view>
+        </template>
+      </template>
+
+      <view v-if="status === 'error'" class="panel">
+        <view class="panel__text">{{ errorMsg }}</view>
+        <AppButton v-if="!forbidden" variant="ghost" size="sm" @click="load">再试一次</AppButton>
       </view>
 
-      <template v-if="!forbidden">
-        <view class="stats">
-          <view class="stats__item"><text class="stats__num">{{ schedule?.stats.total ?? '–' }}</text>当天预约</view>
-          <view class="stats__item">
-            <text class="stats__num">{{ schedule ? schedule.stats.pending - schedule.stats.stale : '–' }}</text>待确认
-            <text v-if="schedule?.stats.stale" class="stats__extra">另有 {{ schedule.stats.stale }} 个已过时</text>
+      <template v-else>
+        <!-- 循环变量别用单字母：uni-app 编译后的数据键也是单字母，会撞上（之前 p 撞了 dateText，提醒条渲染不出来） -->
+        <view v-for="pend in pendings" :key="pend.booking.id" class="pending">
+          <view class="pending__text">
+            <view class="pending__name">新预约：{{ pend.booking.customerName }}</view>
+            {{ dateText }} {{ pend.time }}　{{ pend.artistName }}　{{ pend.booking.serviceName }}　定金已付
           </view>
-          <view class="stats__item"><text class="stats__num">{{ schedule?.stats.free ?? '–' }}</text>空闲时段</view>
+          <AppButton size="sm" :loading="busyKey === pend.booking.id" loading-text="确认中…" @click="confirm(pend.booking)">确认</AppButton>
         </view>
-        <view class="days">
-          <DayPicker :model-value="date" :dates="dates" @update:model-value="changeDate" />
+
+        <view v-if="schedule" class="grid">
+          <view class="grid__row">
+            <view class="grid__time" />
+            <view v-for="a in schedule.artists" :key="a.id" class="grid__head">{{ a.name }}</view>
+          </view>
+          <view v-for="row in rows" :key="row.time" class="grid__row">
+            <view class="grid__time">{{ row.time }}</view>
+            <view
+              v-for="c in row.cells"
+              :key="c.artistId"
+              class="cell"
+              :class="[`cell--${cellTone(c)}`, { 'cell--busy': busyKey === cellKey(c) }]"
+              @tap="tapCell(c)"
+            >
+              <template v-if="c.state === 'free'">可约</template>
+              <template v-else-if="c.state === 'blocked'">休息</template>
+              <template v-else-if="c.state === 'past'">已过</template>
+              <template v-else-if="c.booking">
+                <text>{{ c.booking.customerName }}</text>
+                <text class="cell__sub" :class="{ 'cell__sub--alert': c.state === 'booked' && c.booking.alert && c.booking.status !== 'pending_payment' }">
+                  {{ cellSub(c) }}
+                </text>
+              </template>
+            </view>
+          </view>
+        </view>
+
+        <view class="legend">
+          <view class="legend__item"><text class="legend__dot legend__dot--booked" />已约</view>
+          <view class="legend__item"><text class="legend__dot legend__dot--pending" />待确认</view>
+          <view class="legend__item"><text class="legend__dot legend__dot--free" />空闲，点一下设为休息</view>
+          <view class="legend__item"><text class="legend__dot legend__dot--blocked" />休息</view>
+          <view v-if="hasPast" class="legend__item"><text class="legend__dot legend__dot--past" />已过去，不能再改</view>
         </view>
       </template>
-    </template>
+    </PageLayout>
 
-    <view v-if="status === 'error'" class="panel">
-      <view class="panel__text">{{ errorMsg }}</view>
-      <AppButton v-if="!forbidden" variant="ghost" size="sm" @click="load">再试一次</AppButton>
-    </view>
-
-    <template v-else>
-      <!-- 循环变量别用单字母：uni-app 编译后的数据键也是单字母，会撞上（之前 p 撞了 dateText，提醒条渲染不出来） -->
-      <view v-for="pend in pendings" :key="pend.booking.id" class="pending">
-        <view class="pending__text">
-          <view class="pending__name">新预约：{{ pend.booking.customerName }}</view>
-          {{ dateText }} {{ pend.time }}　{{ pend.artistName }}　{{ pend.booking.serviceName }}　定金已付
+    <!-- 预约详情：点已约 / 待确认的格子打开 -->
+    <BottomSheet v-model:open="sheetOpen" @closed="detail = undefined">
+      <view v-if="detail" class="detail">
+        <view class="detail__head">
+          <view>
+            <view class="detail__name">{{ detail.booking.customerName }}</view>
+            <view class="detail__when">{{ detailWhen }}</view>
+          </view>
+          <StatusBadge :status="detail.booking.status" />
         </view>
-        <AppButton size="sm" :loading="busyKey === pend.booking.id" loading-text="确认中…" @click="confirm(pend.booking)">确认</AppButton>
-      </view>
 
-      <view v-if="schedule" class="grid">
-        <view class="grid__row">
-          <view class="grid__time" />
-          <view v-for="a in schedule.artists" :key="a.id" class="grid__head">{{ a.name }}</view>
-        </view>
-        <view v-for="row in rows" :key="row.time" class="grid__row">
-          <view class="grid__time">{{ row.time }}</view>
-          <view
-            v-for="c in row.cells"
-            :key="c.artistId"
-            class="cell"
-            :class="[`cell--${cellTone(c)}`, { 'cell--busy': busyKey === cellKey(c) }]"
-            @tap="tapCell(c)"
-          >
-            <template v-if="c.state === 'free'">可约</template>
-            <template v-else-if="c.state === 'blocked'">休息</template>
-            <template v-else-if="c.state === 'past'">已过</template>
-            <template v-else-if="c.booking">
-              <text>{{ c.booking.customerName }}</text>
-              <text class="cell__sub" :class="{ 'cell__sub--alert': c.state === 'booked' && c.booking.alert && c.booking.status !== 'pending_payment' }">
-                {{ cellSub(c) }}
-              </text>
-            </template>
+        <view class="detail__rows">
+          <view class="detail__row"><text class="detail__k">项目</text>{{ detail.booking.serviceName }}</view>
+          <view class="detail__row">
+            <text class="detail__k">场合</text>{{ detail.booking.occasion ? OCCASION_LABEL[detail.booking.occasion] : '没选' }}
+          </view>
+          <view class="detail__row">
+            <text class="detail__k">这次肤质</text>{{ detail.booking.skinType ? SKIN_LABEL[detail.booking.skinType] : '没选' }}
           </view>
         </view>
-      </view>
 
-      <view class="legend">
-        <view class="legend__item"><text class="legend__dot legend__dot--booked" />已约</view>
-        <view class="legend__item"><text class="legend__dot legend__dot--pending" />待确认</view>
-        <view class="legend__item"><text class="legend__dot legend__dot--free" />空闲，点一下设为休息</view>
-        <view class="legend__item"><text class="legend__dot legend__dot--blocked" />休息</view>
-        <view v-if="hasPast" class="legend__item"><text class="legend__dot legend__dot--past" />已过去，不能再改</view>
+        <view v-if="detail.booking.alert || detail.booking.note" class="detail__alert">
+          <view v-if="detail.booking.alert" class="detail__alert-title">{{ detail.booking.alert }}</view>
+          <view v-if="detail.booking.note">{{ detail.booking.note }}</view>
+        </view>
+
+        <view class="detail__h">肤质档案</view>
+        <view v-if="profileRows.length" class="detail__rows">
+          <view v-for="row in profileRows" :key="row.k" class="detail__row"><text class="detail__k">{{ row.k }}</text>{{ row.v }}</view>
+        </view>
+        <view v-else class="detail__empty">
+          {{ detail.booking.profile ? '档案里只写了过敏情况，已经放在上面了' : '客人还没填肤质档案，到店时可以当面问一下' }}
+        </view>
+
+        <view v-if="detailHint" class="detail__hint">{{ detailHint }}</view>
+        <view class="detail__acts">
+          <AppButton variant="ghost" class="detail__btn" @click="sheetOpen = false">关闭</AppButton>
+          <AppButton
+            v-if="detail.booking.canConfirm"
+            class="detail__btn"
+            :loading="busyKey === detail.booking.id"
+            loading-text="确认中…"
+            @click="confirmInSheet"
+          >
+            确认
+          </AppButton>
+        </view>
       </view>
-    </template>
-  </PageLayout>
+    </BottomSheet>
+  </view>
 </template>
 
 <script setup lang="ts">
@@ -79,10 +131,13 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import {
   api, errorText, ApiError,
-  type DateStr, type DaySchedule, type ID, type OwnerBookingBrief, type ScheduleCell,
+  type DateStr, type DaySchedule, type ID, type OwnerBookingBrief, type ScheduleCell, type TimeStr,
+  OCCASION_LABEL, SKIN_LABEL, TONE_LABEL,
 } from '@/api'
-import { formatDateCN } from '@/utils/date'
+import { addMinutes, formatDateCN } from '@/utils/date'
 import AppButton from '@/components/AppButton.vue'
+import BottomSheet from '@/components/BottomSheet.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
 import DayPicker from '@/components/DayPicker.vue'
 import PageLayout from '@/components/PageLayout.vue'
 
@@ -186,7 +241,7 @@ async function run(key: string, action: () => Promise<unknown>, done: string) {
 }
 
 function confirm(b: OwnerBookingBrief) {
-  run(b.id, async () => {
+  return run(b.id, async () => {
     await api.confirmBooking(b.id)
     confirmedHere.value.add(b.id)
   }, '已确认，已通知客人')
@@ -203,17 +258,55 @@ function tapCell(c: ScheduleCell) {
       return run(cellKey(c), () => api.unblockSlot(c.artistId, d, c.time), `${who} 恢复可约`)
     case 'past':
       return toast('这个时段已经过去了')
+    // 有预约的格子先看详情，确认也在详情里点，避免在网格里误触
     case 'pending':
-      if (!c.booking) return
-      return c.booking.canConfirm ? confirm(c.booking) : toast('预约时间已经过了，不能再确认')
-    case 'booked': {
-      const b = c.booking
-      if (!b) return
-      if (b.status === 'pending_payment') return toast(`${b.customerName} 刚下单，还没付定金。15 分钟内没付会自动放出来`)
-      const extra = [b.alert, b.note && `备注：${b.note}`].filter(Boolean).join('，')
-      return toast([b.customerName, b.serviceName, extra].filter(Boolean).join('　'))
-    }
+    case 'booked':
+      if (c.booking) openDetail(c.time, c.artistId, c.booking)
   }
+}
+
+// ---------- 预约详情 ----------
+
+const sheetOpen = ref(false)
+const detail = ref<{ time: TimeStr; artistId: ID; booking: OwnerBookingBrief }>()
+
+function openDetail(time: TimeStr, artistId: ID, booking: OwnerBookingBrief) {
+  detail.value = { time, artistId, booking }
+  sheetOpen.value = true
+}
+
+/** '10月3日 周六 09:00–10:30　小鲸' */
+const detailWhen = computed(() => {
+  const d = detail.value
+  if (!d) return ''
+  const end = d.booking.durationMin ? `–${addMinutes(d.time, d.booking.durationMin)}` : ''
+  return `${dateText.value} ${d.time}${end}　${artistName(d.artistId)}`
+})
+
+/** 过敏情况已经合并在 note 里显示，档案这里不重复 */
+const profileRows = computed(() => {
+  const p = detail.value?.booking.profile
+  if (!p) return []
+  return [
+    p.skinType && { k: '肤质', v: SKIN_LABEL[p.skinType] },
+    p.tone && { k: '肤色', v: TONE_LABEL[p.tone] },
+    p.note && { k: '其他', v: p.note },
+  ].filter((r): r is { k: string; v: string } => !!r)
+})
+
+const detailHint = computed(() => {
+  const b = detail.value?.booking
+  if (!b) return ''
+  if (b.status === 'pending_payment') return '刚下单，还没付定金。15 分钟内没付会自动放出来'
+  if (b.status === 'pending_confirm' && !b.canConfirm) return '预约时间已经过了，不能再确认'
+  return ''
+})
+
+async function confirmInSheet() {
+  const b = detail.value?.booking
+  if (!b) return
+  await confirm(b)
+  sheetOpen.value = false
 }
 </script>
 
@@ -431,6 +524,95 @@ function tapCell(c: ScheduleCell) {
     font-size: $fs-small;
     line-height: 1.7;
     color: $mute;
+  }
+}
+
+.detail {
+  &__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20rpx;
+    margin-bottom: 28rpx;
+  }
+
+  &__name {
+    font-family: $font-serif;
+    font-weight: 600;
+    font-size: $fs-h2 + 2rpx;
+  }
+
+  &__when {
+    margin-top: 6rpx;
+    font-size: $fs-caption + 2rpx;
+    color: $mute;
+  }
+
+  &__rows {
+    padding: 4rpx 28rpx;
+    border-radius: $r-inner;
+    background: $card;
+  }
+
+  &__row {
+    display: flex;
+    gap: 24rpx;
+    padding: 20rpx 0;
+    border-bottom: 2rpx dashed $hair;
+    font-size: $fs-small;
+    line-height: 1.5;
+
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+
+  &__k {
+    flex: none;
+    width: 120rpx;
+    color: $mute;
+  }
+
+  // 过敏、敏感肌这类要化妆师提前准备的，用和格子里一样的裸粉提醒色
+  &__alert {
+    margin-top: 20rpx;
+    padding: 20rpx 28rpx;
+    border-radius: $r-inner;
+    background: $blush;
+    font-size: $fs-small;
+    line-height: 1.6;
+    color: $blush-ink;
+  }
+
+  &__alert-title {
+    font-weight: 600;
+  }
+
+  &__h {
+    margin: 32rpx 0 16rpx;
+    font-size: $fs-body;
+    font-weight: 600;
+  }
+
+  &__empty,
+  &__hint {
+    font-size: $fs-caption + 2rpx;
+    line-height: 1.6;
+    color: $mute;
+  }
+
+  &__hint {
+    margin-top: 28rpx;
+  }
+
+  &__acts {
+    display: flex;
+    gap: 20rpx;
+    margin-top: 36rpx;
+  }
+
+  &__btn {
+    flex: 1;
   }
 }
 </style>

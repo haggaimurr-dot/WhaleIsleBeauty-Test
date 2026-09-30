@@ -7,7 +7,7 @@ import {
   ApiError, type Artist, type Booking, type BookingStatus, type CreateBookingReq,
   type DateStr, type DaySchedule, type ID, type Me, type OwnerBookingBrief,
   type ScheduleCell, type Service, type Shop, type SkinProfile, type SkinType, type SlotView,
-  type TimeStr, type UpdateSkinProfileReq, type Work, TONE_LABEL,
+  type TimeStr, type UpdateSkinProfileReq, type Work, type Occasion, TONE_LABEL,
 } from './types'
 import { upcomingDates, datesFromToday, toTimestamp, hoursUntil, todayStr, nowTimeStr } from '../utils/date'
 
@@ -82,15 +82,18 @@ const SKIN_SUMMARY: Partial<Record<SkinType, string>> = {
   dry: '干皮', oily: '油皮', combination: '混合皮', sensitive: '敏感肌',
 }
 
+const hasProfile = (p: SkinProfile) => !!(p.skinType || p.tone || p.allergies || p.note)
+
 /** 例如“敏感肌 · 冷白皮”；只填了文字说明时写“已填写” */
 function skinSummary(p: SkinProfile): string | undefined {
   const parts = [p.skinType && SKIN_SUMMARY[p.skinType], p.tone && p.tone !== 'unsure' && TONE_LABEL[p.tone]].filter(Boolean)
   if (parts.length) return parts.join(' · ')
-  return p.skinType || p.tone || p.allergies || p.note ? '已填写' : undefined
+  return hasProfile(p) ? '已填写' : undefined
 }
 
 const OTHER_NAMES = ['林小姐', '陈小姐', '周小姐', '许小姐', '黄小姐', '吴小姐', '郑小姐', '何小姐']
 const OTHER_SERVICES = ['上镜妆', '约会妆', '新娘试妆', '主持妆', '面试妆']
+const OTHER_OCCASIONS: Occasion[] = ['photo', 'date', 'event', 'interview']
 const ACTIVE: BookingStatus[] = ['pending_payment', 'pending_confirm', 'confirmed']
 const PAY_WINDOW_MS = 15 * 60 * 1000
 
@@ -351,6 +354,8 @@ export const mockApi: Api = {
             id: real.id, customerName: me.nickname, serviceName: real.serviceName, status: real.status,
             ...ownerAlert(real.skinType, real.note),
             canConfirm: real.status === 'pending_confirm' && !isPast(real.date, real.time),
+            durationMin: real.durationMin, occasion: real.occasion, skinType: real.skinType,
+            profile: hasProfile(skinProfile) ? clone(skinProfile) : undefined,
           }
           // pending_payment 也算占着：付款截止前为客人保留
           cell.state = real.status === 'pending_confirm' ? 'pending' : 'booked'
@@ -362,8 +367,13 @@ export const mockApi: Api = {
           cell.booking = {
             id: `other-${h}`, customerName: OTHER_NAMES[h % OTHER_NAMES.length],
             serviceName: OTHER_SERVICES[h % OTHER_SERVICES.length], status: 'confirmed',
-            alert: sensitive ? '敏感肌' : undefined, note: sensitive ? '对酒精过敏' : undefined,
+            alert: sensitive ? '敏感肌' : undefined, note: sensitive ? '过敏：对酒精过敏' : undefined,
             canConfirm: false,
+            durationMin: 90,
+            occasion: OTHER_OCCASIONS[h % OTHER_OCCASIONS.length],
+            profile: sensitive
+              ? { skinType: 'sensitive', tone: 'warm_fair', allergies: '对酒精过敏' }
+              : h % 3 === 0 ? { skinType: 'oily', note: '单眼皮，喜欢眼妆淡一点' } : undefined,
           }
         } else if (isPast(date, time)) {
           cell.state = 'past'

@@ -245,6 +245,14 @@ export interface OwnerBookingBrief {
   note?: string
   /** 服务端计算：pending_confirm 且开始时间还没到才为 true，前端据此决定是否显示“确认” */
   canConfirm: boolean
+  // ---- 以下用于店主点开格子看详情 ----
+  durationMin?: number
+  /** 客人这次选的场合 */
+  occasion?: Occasion
+  /** 客人这次选的肤质（可能和档案不同） */
+  skinType?: SkinType
+  /** 客人的肤质档案，下单时的最新版本；没填过不返回。过敏情况已经合并在 note 里 */
+  profile?: SkinProfile
 }
 
 /**

@@ -1,35 +1,87 @@
 /**
  * 真实后端实现（Go 服务）。演示阶段不使用。
- * 如果部署在微信云托管，可以把 uni.request 换成 wx.cloud.callContainer，免去域名备案和 HTTPS 配置。
+ *
+ * 部署在微信云托管，通过 wx.cloud.callContainer 调用：不用域名备案和 HTTPS 证书，
+ * 网关会在每个请求上带上 X-WX-OPENID，后端据此识别客人，前端不用管 token。
+ * 以后要换成自己的域名，把 TRANSPORT 改成 'https' 即可，登录会自动走 code 换 token。
+ * 云托管的 callContainer 需要基础库 2.23.0 以上，在小程序后台把最低基础库设到这个版本。
  */
 import type { Api } from './contract'
 import { ApiError, type ErrorCode, type Me } from './types'
 
-const BASE_URL = 'https://api.example.com/v1' // TODO: 换成真实地址
+const TRANSPORT = 'cloud' as 'cloud' | 'https'
+const CLOUD_ENV = '' // TODO: 云托管环境 ID，例如 prod-xxxx
+const CLOUD_SERVICE = '' // TODO: 云托管服务名称
+const BASE_URL = 'https://api.example.com' // TODO: 仅 https 模式使用
+/** 两种模式路径一致，Go 服务只需要挂在 /v1 下 */
+const API_PREFIX = '/v1'
 const TOKEN_KEY = 'jy_token'
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
+interface RawResponse { statusCode: number; data: unknown }
+
+/** 只声明用到的部分，不引入额外类型包 */
+interface WxCloud {
+  init(opt?: { env?: string; traceUser?: boolean }): void
+  callContainer(opt: {
+    config: { env: string }
+    path: string
+    method: Method
+    header: Record<string, string>
+    data?: unknown
+    success: (res: RawResponse) => void
+    fail: (err: unknown) => void
+  }): void
+}
+declare const wx: { cloud?: WxCloud }
+
+let cloudReady = false
+
+function transport(method: Method, path: string, data: unknown, header: Record<string, string>): Promise<RawResponse> {
+  return new Promise((resolve, reject) => {
+    if (TRANSPORT === 'cloud') {
+      const cloud = wx.cloud
+      if (!cloud) return reject(new Error('wx.cloud 不可用，基础库版本太低'))
+      if (!cloudReady) { cloud.init({ env: CLOUD_ENV }); cloudReady = true }
+      cloud.callContainer({
+        config: { env: CLOUD_ENV },
+        path: API_PREFIX + path,
+        method,
+        header: { 'X-WX-SERVICE': CLOUD_SERVICE, 'content-type': 'application/json', ...header },
+        data,
+        success: resolve,
+        fail: reject,
+      })
+    } else {
+      uni.request({
+        url: BASE_URL + API_PREFIX + path,
+        method,
+        data: data as UniApp.RequestOptions['data'],
+        header,
+        success: res => resolve({ statusCode: res.statusCode, data: res.data }),
+        fail: reject,
+      })
+    }
+  })
+}
+
 interface RawResult<T> { ok: true; data: T }
 interface RawError { ok: false; error: ApiError }
 
-/** 发一次请求，不处理登录。token 为 undefined 时不带 Authorization */
-function send<T>(method: Method, path: string, data: unknown, token?: string): Promise<RawResult<T> | RawError> {
-  return new Promise(resolve => {
-    uni.request({
-      url: BASE_URL + path,
-      method,
-      data: data as UniApp.RequestOptions['data'],
-      header: token ? { Authorization: `Bearer ${token}` } : {},
-      success: (res) => {
-        if (res.statusCode >= 200 && res.statusCode < 300) return resolve({ ok: true, data: res.data as T })
-        const body = (res.data || {}) as { code?: ErrorCode; message?: string }
-        const fallback: ErrorCode = res.statusCode === 401 ? 'UNAUTHORIZED' : 'UNKNOWN'
-        resolve({ ok: false, error: new ApiError(body.code ?? fallback, body.message ?? '') })
-      },
-      fail: () => resolve({ ok: false, error: new ApiError('NETWORK', '') }),
-    })
-  })
+/** 发一次请求，不处理登录。有 token 才带 Authorization（云托管模式通常没有） */
+async function send<T>(method: Method, path: string, data: unknown): Promise<RawResult<T> | RawError> {
+  const token = getToken()
+  let res: RawResponse
+  try {
+    res = await transport(method, path, data, token ? { Authorization: `Bearer ${token}` } : {})
+  } catch {
+    return { ok: false, error: new ApiError('NETWORK', '') }
+  }
+  if (res.statusCode >= 200 && res.statusCode < 300) return { ok: true, data: res.data as T }
+  const body = (res.data || {}) as { code?: ErrorCode; message?: string }
+  const fallback: ErrorCode = res.statusCode === 401 ? 'UNAUTHORIZED' : 'UNKNOWN'
+  return { ok: false, error: new ApiError(body.code ?? fallback, body.message ?? '') }
 }
 
 // ---------- 登录 ----------
@@ -38,14 +90,19 @@ const getToken = (): string | undefined => uni.getStorageSync(TOKEN_KEY) || unde
 
 /** 同一时间只跑一次登录：启动时的 login() 和过期后的重新登录都共用它 */
 let loggingIn: Promise<Me> | undefined
+/** 每登录成功一次加 1。0 表示这次启动还没登录过 */
+let loginGen = 0
 
 function doLogin(): Promise<Me> {
   loggingIn ??= (async () => {
     try {
-      const { code } = await uni.login({ provider: 'weixin' })
-      const res = await send<{ token: string; me: Me }>('POST', '/auth/wx-login', { code })
+      // 云托管靠网关带的 openid 识别客人，不用 code；https 模式用 code 换 token
+      const body = TRANSPORT === 'cloud' ? {} : { code: (await uni.login({ provider: 'weixin' })).code }
+      const res = await send<{ token?: string; me: Me }>('POST', '/auth/wx-login', body)
       if (!res.ok) throw res.error
-      uni.setStorageSync(TOKEN_KEY, res.data.token)
+      if (res.data.token) uni.setStorageSync(TOKEN_KEY, res.data.token)
+      else uni.removeStorageSync(TOKEN_KEY)
+      loginGen++
       return res.data.me
     } catch (e) {
       // uni.login 自己失败（没网、微信没响应）也归到 NETWORK
@@ -59,25 +116,25 @@ function doLogin(): Promise<Me> {
 
 /**
  * 需要登录的请求：
- * - 还没有 token（或启动时的登录还没回来）就先等登录
+ * - 这次启动还没登录过（或启动时的登录还没回来）就先等登录
  * - 返回 401 时重新登录，再重试一次原来的请求；还是 401 就把 UNAUTHORIZED 抛给页面
  */
 async function request<T>(method: Method, path: string, data?: unknown): Promise<T> {
   if (loggingIn) await loggingIn.catch(() => {})
-  if (!getToken()) await doLogin()
+  if (!loginGen) await doLogin()
 
-  const sentWith = getToken()
-  const first = await send<T>(method, path, data, sentWith)
+  const sentGen = loginGen
+  const first = await send<T>(method, path, data)
   if (first.ok) return first.data
   if (first.error.code !== 'UNAUTHORIZED') throw first.error
 
-  // 等待期间别的请求可能已经换过 token 了，那就直接用新的重试，不用再登录一次
+  // 等待期间别的请求可能已经重新登录过了，那就直接重试，不用再登录一次
   if (loggingIn) await loggingIn
-  else if (getToken() === sentWith) {
+  else if (loginGen === sentGen) {
     uni.removeStorageSync(TOKEN_KEY)
     await doLogin()
   }
-  const retry = await send<T>(method, path, data, getToken())
+  const retry = await send<T>(method, path, data)
   if (retry.ok) return retry.data
   throw retry.error
 }

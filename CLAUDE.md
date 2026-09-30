@@ -2,7 +2,7 @@
 
 私人化妆工作室的微信小程序。客人端用于看作品、预约、管理自己的预约；店主端用于排班和确认预约。两端在同一个小程序里，按用户角色显示入口。
 
-当前阶段是**演示版**：所有数据来自本地 mock，不接真实后端、不接真实支付。后端将来用 Go 实现，接口契约已经定义在 `src/api/contract.ts`。
+当前阶段是**演示版**：所有数据来自本地 mock，不接真实后端、不接真实支付。后端将来用 Go 实现，部署在**微信云托管**，前端通过 `wx.cloud.callContainer` 调用（见 `src/api/http.ts`），接口契约已经定义在 `src/api/contract.ts`。
 
 ## 技术栈
 
@@ -98,6 +98,7 @@ TabBar 包含首页、作品、预约、我的，使用 `pages.json` 的原生 t
 - `StatusBadge`：根据 `BookingStatus` 显示对应颜色和文案。
 - `PageLayout`：页面骨架，头尾固定、中间内容滚动、不显示滚动条。所有页面都用它。
 - `BottomBar`：页面底部的操作栏，放在 `PageLayout` 的 `#footer` 里，自动处理 safe-area。
+- `BottomSheet`：底部弹层（遮罩 + 滑入面板），`v-model:open` 控制。tabBar 页里用时要自己藏起 tabBar。
 
 ## 工作方式
 
