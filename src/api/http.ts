@@ -3,18 +3,13 @@
  *
  * 部署在微信云托管，通过 wx.cloud.callContainer 调用：不用域名备案和 HTTPS 证书，
  * 网关会在每个请求上带上 X-WX-OPENID，后端据此识别客人，前端不用管 token。
- * 以后要换成自己的域名，把 TRANSPORT 改成 'https' 即可，登录会自动走 code 换 token。
+ * 部署配置（环境 ID、服务名、传输方式）在 config.ts。换成自己的域名时把 TRANSPORT 改成 'https'，登录会自动走 code 换 token。
  * 云托管的 callContainer 需要基础库 2.23.0 以上，在小程序后台把最低基础库设到这个版本。
  */
+import { API_PREFIX, BASE_URL, CLOUD_ENV, CLOUD_SERVICE, TRANSPORT } from './config'
 import type { Api } from './contract'
 import { ApiError, type ErrorCode, type Me } from './types'
 
-const TRANSPORT = 'cloud' as 'cloud' | 'https'
-const CLOUD_ENV = '' // TODO: 云托管环境 ID，例如 prod-xxxx
-const CLOUD_SERVICE = '' // TODO: 云托管服务名称
-const BASE_URL = 'https://api.example.com' // TODO: 仅 https 模式使用
-/** 两种模式路径一致，Go 服务只需要挂在 /v1 下 */
-const API_PREFIX = '/v1'
 const TOKEN_KEY = 'jy_token'
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE'
