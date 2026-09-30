@@ -58,7 +58,7 @@ export interface Api {
    * 后端需保证同一 (artistId, date, time) 不会被重复预约，冲突返回 409 SLOT_TAKEN
    *
    * 订阅消息：客人点“付定金并预约”“继续付定金”时，前端请求订阅“预约确认”“到店提醒”两个一次性模板
-   * （模板 ID 见 utils/subscribe.ts）。后端在 confirmBooking 后发预约确认，在开始前发到店提醒；
+   * （模板 ID 见 utils/subscribe.ts）。后端在 confirmBooking 后发预约确认，在开始前一天发到店提醒（成功页文案写的是“前一天也会提醒你”）；
    * 客人没同意时微信会返回 43101，后端忽略即可，不影响预约。
    */
   createBooking(req: CreateBookingReq): Promise<CreateBookingResp>

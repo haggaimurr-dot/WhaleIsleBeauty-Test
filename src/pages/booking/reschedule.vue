@@ -39,7 +39,7 @@
     </template>
 
     <template #footer>
-      <BottomBar v-if="editable" :title="summary" :desc="depositText">
+      <BottomBar v-if="editable" :title="summary" :desc="unchanged ? '这就是原来的时间，选一个新的吧' : depositText">
         <AppButton :disabled="!time || unchanged" :loading="saving" loading-text="正在改期…" @click="submit">确认改期</AppButton>
       </BottomBar>
     </template>
@@ -96,7 +96,7 @@ const unchanged = computed(() => {
 const summary = computed(() => {
   const artist = artists.value.find(a => a.id === artistId.value)
   return date.value && time.value && artist
-    ? `${formatDateCN(date.value)} ${time.value}　${artist.name}${unchanged.value ? '（原来的时间）' : ''}`
+    ? `${formatDateCN(date.value)} ${time.value}　${artist.name}`
     : '还没选新时间'
 })
 

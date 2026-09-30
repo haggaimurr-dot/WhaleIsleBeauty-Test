@@ -27,12 +27,13 @@
     </view>
 
     <template v-else>
-      <view v-for="p in pendings" :key="p.booking.id" class="pending">
+      <!-- 循环变量别用单字母：uni-app 编译后的数据键也是单字母，会撞上（之前 p 撞了 dateText，提醒条渲染不出来） -->
+      <view v-for="pend in pendings" :key="pend.booking.id" class="pending">
         <view class="pending__text">
-          <view class="pending__name">新预约：{{ p.booking.customerName }}</view>
-          {{ dateText }} {{ p.time }}　{{ p.artistName }}　{{ p.booking.serviceName }}　定金已付
+          <view class="pending__name">新预约：{{ pend.booking.customerName }}</view>
+          {{ dateText }} {{ pend.time }}　{{ pend.artistName }}　{{ pend.booking.serviceName }}　定金已付
         </view>
-        <AppButton size="sm" :loading="busyKey === p.booking.id" loading-text="确认中…" @click="confirm(p.booking)">确认</AppButton>
+        <AppButton size="sm" :loading="busyKey === pend.booking.id" loading-text="确认中…" @click="confirm(pend.booking)">确认</AppButton>
       </view>
 
       <view v-if="schedule" class="grid">

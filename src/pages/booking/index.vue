@@ -170,6 +170,8 @@ onLoad(load)
 onShow(() => {
   // 从“我的”改完档案再切回来，预选跟着变
   syncProfileSkin()
+  // tab 页切回来时时段可能已经变了（别人约走了、自己刚约了），重新拉一次；首次进入由 SlotPicker 自己拉
+  if (status.value === 'ok') picker.value?.refresh()
   const p = takeTabParams('booking')
   if (p) {
     pendingParams = p
