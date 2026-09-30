@@ -24,7 +24,8 @@
 <script setup lang="ts">
 /**
  * 横向日期选择，用 v-model 绑定选中的日期。
- * dates 通常来自 api.listBookableDates()，从明天开始，所以第一个显示“明天”。
+ * 客人端 dates 来自 api.listBookableDates()（从明天开始），店主排班来自 api.listScheduleDates()（从今天开始）。
+ * 标签按日期本身算：今天、明天，其余显示周几。
  * 组件自己带页面左右边距，父组件放置时不要再包一层带 padding 的容器。
  */
 import { ref, watch } from 'vue'

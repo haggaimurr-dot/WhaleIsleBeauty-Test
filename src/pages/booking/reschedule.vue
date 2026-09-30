@@ -28,6 +28,7 @@
         v-model:date="date"
         v-model:time="time"
         :service-id="booking.serviceId"
+        :exclude-booking-id="booking.id"
         :artists="artists"
         :dates="dates"
       />
@@ -39,7 +40,7 @@
 
     <template #footer>
       <BottomBar v-if="editable" :title="summary" :desc="depositText">
-        <AppButton :disabled="!time" :loading="saving" loading-text="正在改期…" @click="submit">确认改期</AppButton>
+        <AppButton :disabled="!time || unchanged" :loading="saving" loading-text="正在改期…" @click="submit">确认改期</AppButton>
       </BottomBar>
     </template>
   </PageLayout>
@@ -85,10 +86,16 @@ const originalText = computed(() => {
 })
 const depositText = computed(() => (booking.value ? `已付定金 ${formatPrice(booking.value.deposit)}，不用再付` : ''))
 
+/** 选回了原来的时段，不算改期 */
+const unchanged = computed(() => {
+  const b = booking.value
+  return !!b && b.artistId === artistId.value && b.date === date.value && b.time === time.value
+})
+
 const summary = computed(() => {
   const artist = artists.value.find(a => a.id === artistId.value)
   return date.value && time.value && artist
-    ? `${formatDateCN(date.value)} ${time.value}　${artist.name}`
+    ? `${formatDateCN(date.value)} ${time.value}　${artist.name}${unchanged.value ? '（原来的时间）' : ''}`
     : '还没选新时间'
 })
 

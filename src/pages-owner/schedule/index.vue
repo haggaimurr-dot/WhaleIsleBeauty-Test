@@ -9,7 +9,10 @@
       <template v-if="!forbidden">
         <view class="stats">
           <view class="stats__item"><text class="stats__num">{{ schedule?.stats.total ?? '–' }}</text>当天预约</view>
-          <view class="stats__item"><text class="stats__num">{{ schedule?.stats.pending ?? '–' }}</text>待确认</view>
+          <view class="stats__item">
+            <text class="stats__num">{{ schedule ? schedule.stats.pending - schedule.stats.stale : '–' }}</text>待确认
+            <text v-if="schedule?.stats.stale" class="stats__extra">另有 {{ schedule.stats.stale }} 个已过时</text>
+          </view>
           <view class="stats__item"><text class="stats__num">{{ schedule?.stats.free ?? '–' }}</text>空闲时段</view>
         </view>
         <view class="days">
@@ -48,6 +51,7 @@
           >
             <template v-if="c.state === 'free'">可约</template>
             <template v-else-if="c.state === 'blocked'">休息</template>
+            <template v-else-if="c.state === 'past'">已过</template>
             <template v-else-if="c.booking">
               <text>{{ c.booking.customerName }}</text>
               <text class="cell__sub" :class="{ 'cell__sub--alert': c.state === 'booked' && c.booking.alert }">
@@ -63,6 +67,7 @@
         <view class="legend__item"><text class="legend__dot legend__dot--pending" />待确认</view>
         <view class="legend__item"><text class="legend__dot legend__dot--free" />空闲，点一下设为休息</view>
         <view class="legend__item"><text class="legend__dot legend__dot--blocked" />休息</view>
+        <view v-if="hasPast" class="legend__item"><text class="legend__dot legend__dot--past" />已过去，不能再改</view>
       </view>
     </template>
   </PageLayout>
@@ -105,9 +110,11 @@ const rows = computed(() => {
   return s.times.map((time, i) => ({ time, cells: s.cells.slice(i * n, i * n + n) }))
 })
 
+const hasPast = computed(() => !!schedule.value?.cells.some(c => c.state === 'past'))
+
 const pendings = computed(() =>
   (schedule.value?.cells ?? [])
-    .filter((c): c is ScheduleCell & { booking: OwnerBookingBrief } => c.state === 'pending' && !!c.booking)
+    .filter((c): c is ScheduleCell & { booking: OwnerBookingBrief } => c.state === 'pending' && !!c.booking?.canConfirm)
     .map(c => ({ time: c.time, artistName: artistName(c.artistId), booking: c.booking })),
 )
 
@@ -119,7 +126,7 @@ function cellTone(c: ScheduleCell) {
 function cellSub(c: ScheduleCell) {
   const b = c.booking
   if (!b) return ''
-  if (c.state === 'pending') return '待确认'
+  if (c.state === 'pending') return b.canConfirm ? '待确认' : '已过时，未确认'
   if (cellTone(c) === 'ok') return '已确认'
   return b.alert ?? b.serviceName
 }
@@ -131,7 +138,7 @@ async function load() {
   if (!schedule.value) status.value = 'loading'
   try {
     if (!dates.value.length) {
-      dates.value = await api.listBookableDates()
+      dates.value = await api.listScheduleDates()
       date.value = dates.value[0]
     }
     if (!date.value) return
@@ -192,8 +199,11 @@ function tapCell(c: ScheduleCell) {
       return run(cellKey(c), () => api.blockSlot(c.artistId, d, c.time), `${who} 设为休息`)
     case 'blocked':
       return run(cellKey(c), () => api.unblockSlot(c.artistId, d, c.time), `${who} 恢复可约`)
+    case 'past':
+      return toast('这个时段已经过去了')
     case 'pending':
-      return c.booking && confirm(c.booking)
+      if (!c.booking) return
+      return c.booking.canConfirm ? confirm(c.booking) : toast('预约时间已经过了，不能再确认')
     case 'booked': {
       const b = c.booking
       if (!b) return
@@ -239,6 +249,12 @@ function tapCell(c: ScheduleCell) {
     background: $card;
     font-size: $fs-caption;
     color: $mute;
+  }
+
+  &__extra {
+    display: block;
+    font-size: 20rpx;
+    color: $disabled;
   }
 
   &__num {
@@ -361,6 +377,11 @@ function tapCell(c: ScheduleCell) {
     background: repeating-linear-gradient(135deg, $milk 0 12rpx, $hair 12rpx 14rpx);
   }
 
+  &--past {
+    align-items: center;
+    color: $disabled;
+  }
+
   &--busy {
     opacity: 0.5;
   }
@@ -391,6 +412,7 @@ function tapCell(c: ScheduleCell) {
     &--pending { background: $card; box-shadow: inset 0 0 0 3rpx $rose; }
     &--free { box-shadow: inset 0 0 0 2rpx $hair; }
     &--blocked { background: repeating-linear-gradient(135deg, $milk 0 6rpx, $hair 6rpx 8rpx); }
+    &--past { border: 2rpx dashed $disabled; box-sizing: border-box; }
   }
 }
 

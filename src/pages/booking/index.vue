@@ -182,7 +182,7 @@ function changeService() {
 const paying = ref(false)
 /**
  * 已下单但没付完的预约。用户取消支付后，时段会被保留 15 分钟；
- * 选择没变时再点一次直接重新拉起支付，不重复下单。
+ * 选择没变时再点一次，用 resumePayment 重新拉起支付，不重复下单。已经超时就当新的一单重新下。
  */
 let unpaid: { key: string; resp: CreateBookingResp } | undefined
 
@@ -199,7 +199,7 @@ async function submit() {
 
   paying.value = true
   try {
-    const resp = unpaid?.key === key ? unpaid.resp : await api.createBooking(req)
+    const resp = (unpaid?.key === key && await resume(unpaid.resp.booking.id)) || await api.createBooking(req)
     unpaid = { key, resp }
     const booking = await payDeposit(resp)
     unpaid = undefined
@@ -213,6 +213,16 @@ async function submit() {
     toast(errorText(e))
   } finally {
     paying.value = false
+  }
+}
+
+/** 重新拿支付参数；已超时或已处理返回 undefined */
+async function resume(id: ID) {
+  try {
+    return await api.resumePayment(id)
+  } catch (e) {
+    if (e instanceof ApiError && e.code === 'INVALID_STATE') return undefined
+    throw e
   }
 }
 

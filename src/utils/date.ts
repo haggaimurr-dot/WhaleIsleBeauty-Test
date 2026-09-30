@@ -18,11 +18,16 @@ export const todayStr = () => toDateStr(new Date())
 export const nowTimeStr = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}` }
 export const toTimestamp = (d: Date): Timestamp => d.toISOString()
 
-/** 从明天开始的 n 天 */
-export function upcomingDates(n: number): DateStr[] {
+function datesFrom(offset: number, n: number): DateStr[] {
   const t = new Date()
-  return Array.from({ length: n }, (_, i) => toDateStr(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1 + i)))
+  return Array.from({ length: n }, (_, i) => toDateStr(new Date(t.getFullYear(), t.getMonth(), t.getDate() + offset + i)))
 }
+
+/** 从明天开始的 n 天（客人可预约的日期） */
+export const upcomingDates = (n: number) => datesFrom(1, n)
+
+/** 从今天开始的 n 天（店主排班） */
+export const datesFromToday = (n: number) => datesFrom(0, n)
 
 /** '9月30日 周三' */
 export function formatDateCN(date: DateStr): string {
@@ -36,9 +41,16 @@ export function formatMonthDay(date: DateStr): string {
   return `${d.getMonth() + 1}月${d.getDate()}日`
 }
 
-/** 日期条上的短标签：'明天' 或 '周三' */
+/** 日期条上的短标签：'今天'、'明天' 或 '周三' */
 export function dayLabel(date: DateStr): string {
+  if (date === todayStr()) return '今天'
   return date === upcomingDates(1)[0] ? '明天' : `周${WEEK[parse(date).getDay()]}`
+}
+
+/** ISO 时间戳 → 本地 'HH:mm'，用于付款截止时间 */
+export function formatClock(ts: Timestamp): TimeStr {
+  const d = new Date(ts)
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 export const dayOfMonth = (date: DateStr) => parse(date).getDate()

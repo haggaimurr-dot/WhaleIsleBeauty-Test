@@ -75,9 +75,10 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
 import { api, errorText, CATEGORY_LABEL, type Service, type StyleCategory } from '@/api'
 import { formatPrice } from '@/utils/money'
+import { SHOP_NAME, sharePath } from '@/utils/share'
 import { switchTab } from '@/utils/tab'
 import AppButton from '@/components/AppButton.vue'
 import ArchImage from '@/components/ArchImage.vue'
@@ -118,6 +119,11 @@ async function load() {
 }
 
 onLoad(load)
+
+onShareAppMessage(() => ({
+  title: `${SHOP_NAME}｜私人化妆工作室，素颜过来就好`,
+  path: sharePath('/pages/home/index'),
+}))
 
 const toBooking = () => switchTab('booking')
 const toWorks = (category?: StyleCategory) => switchTab('works', { category })

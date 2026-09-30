@@ -47,7 +47,7 @@
     <view
       class="sheet-mask"
       :class="{ 'sheet-mask--on': sheetOn }"
-      @tap="closeSheet"
+      @tap="closeSheet()"
       @touchmove.stop.prevent
     />
     <view v-if="current" class="sheet" :class="{ 'sheet--on': sheetOn }" @touchmove.stop.prevent>
@@ -57,7 +57,7 @@
       <view class="sheet__desc">化妆师 {{ artistName(current.artistId) }}　{{ current.durationText }}</view>
       <view class="sheet__desc sheet__desc--last">喜欢这个效果，可以直接约同一位化妆师</view>
       <view class="sheet__row">
-        <AppButton variant="ghost" class="sheet__btn" @click="closeSheet">再看看</AppButton>
+        <AppButton variant="ghost" class="sheet__btn" @click="closeSheet()">再看看</AppButton>
         <AppButton class="sheet__btn" @click="bookSame">预约同款</AppButton>
       </view>
     </view>
@@ -66,11 +66,12 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import {
   api, errorText, CATEGORY_LABEL,
   type Artist, type ID, type StyleCategory, type Work,
 } from '@/api'
+import { SHOP_NAME, shareImage, sharePath } from '@/utils/share'
 import { switchTab, takeTabParams } from '@/utils/tab'
 import AppButton from '@/components/AppButton.vue'
 import ArchImage from '@/components/ArchImage.vue'
@@ -118,6 +119,7 @@ async function loadWorks() {
     works.value = list
     artists.value = artistList
     status.value = 'ok'
+    openSharedWork()
   } catch (e) {
     if (seq !== requestSeq) return
     errorMsg.value = errorText(e)
@@ -130,6 +132,21 @@ function selectCategory(c?: StyleCategory) {
   category.value = c
   layout.value?.scrollToTop()
   loadWorks()
+}
+
+// 从分享卡片进来：?category= 定位分类，?workId= 直接打开那件作品
+let sharedWorkId: ID | undefined
+
+onLoad(query => {
+  const c = query?.category as StyleCategory | undefined
+  if (c && c in CATEGORY_LABEL) category.value = c
+  sharedWorkId = query?.workId || undefined
+})
+
+function openSharedWork() {
+  const w = sharedWorkId && works.value.find(x => x.id === sharedWorkId)
+  sharedWorkId = undefined
+  if (w) openSheet(w)
 }
 
 onShow(() => {
@@ -149,20 +166,46 @@ onShow(() => {
 const current = ref<Work>()
 const sheetOn = ref(false)
 
+// 原生 tabBar 在页面之上，遮罩盖不住它，弹层打开期间先把它藏起来
+const noop = () => {}
+let tabBarTimer: ReturnType<typeof setTimeout> | undefined
+
 function openSheet(w: Work) {
+  clearTimeout(tabBarTimer)
   current.value = w
+  uni.hideTabBar({ animation: false, fail: noop })
   // 先渲染到屏幕外，下一帧再加 --on，transform 过渡才会生效
   setTimeout(() => { sheetOn.value = true }, 20)
 }
 
-function closeSheet() {
+/** 等弹层滑出（0.3s）再放出 tabBar，避免页面高度变化时弹层跳一下；离开页面时立即放出 */
+function closeSheet(immediate = false) {
   sheetOn.value = false
+  clearTimeout(tabBarTimer)
+  tabBarTimer = setTimeout(() => uni.showTabBar({ animation: false, fail: noop }), immediate ? 0 : 300)
 }
+
+// 弹层开着就分享这件作品，否则分享当前分类
+onShareAppMessage(() => {
+  const w = sheetOn.value ? current.value : undefined
+  if (w) {
+    return {
+      title: `${w.title}｜化妆师 ${artistName(w.artistId)}`,
+      path: sharePath('/pages/works/index', { category: w.category, workId: w.id }),
+      imageUrl: shareImage(w.image),
+    }
+  }
+  const c = category.value
+  return {
+    title: c ? `${SHOP_NAME}的${CATEGORY_LABEL[c]}妆作品` : `${SHOP_NAME}的作品，都是来过的客人`,
+    path: sharePath('/pages/works/index', { category: c }),
+  }
+})
 
 function bookSame() {
   const w = current.value
   if (!w) return
-  closeSheet()
+  closeSheet(true)
   switchTab('booking', { artistId: w.artistId, serviceId: w.serviceId })
 }
 </script>
