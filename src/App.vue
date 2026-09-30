@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { onLaunch } from '@dcloudio/uni-app'
+import { api } from '@/api'
 
-onLaunch(() => {})
+// 启动时先登录。页面不用等它：请求发出前会自己等这次登录；这里失败了，第一次请求时会再登录一次
+onLaunch(() => {
+  api.login().catch(() => {})
+})
 </script>
 
 <style lang="scss">

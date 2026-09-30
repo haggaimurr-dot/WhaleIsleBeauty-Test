@@ -14,7 +14,10 @@ import type {
  */
 export interface Api {
   // ---------- 登录 ----------
-  /** POST /auth/wx-login  body: { code }  →  { token, me }，前端缓存 token */
+  /**
+   * POST /auth/wx-login  body: { code }  →  { token, me }，前端缓存 token
+   * 其他接口 token 过期或无效时返回 401 UNAUTHORIZED，前端会重新登录并重试一次原请求
+   */
   login(): Promise<Me>
   /** GET /me */
   getMe(): Promise<Me>
