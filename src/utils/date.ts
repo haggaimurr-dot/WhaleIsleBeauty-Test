@@ -53,6 +53,13 @@ export function formatClock(ts: Timestamp): TimeStr {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+/** '09:00' + 90 → '10:30'，用于显示时间段 */
+export function addMinutes(time: TimeStr, min: number): TimeStr {
+  const [h, m] = time.split(':').map(Number)
+  const t = h * 60 + m + min
+  return `${pad(Math.floor(t / 60) % 24)}:${pad(t % 60)}`
+}
+
 export const dayOfMonth = (date: DateStr) => parse(date).getDate()
 
 export function hoursUntil(date: DateStr, time: TimeStr): number {

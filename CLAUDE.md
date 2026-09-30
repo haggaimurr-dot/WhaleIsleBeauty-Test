@@ -98,6 +98,7 @@ TabBar 包含首页、作品、预约、我的，使用 `pages.json` 的原生 t
 - `StatusBadge`：根据 `BookingStatus` 显示对应颜色和文案。
 - `PageLayout`：页面骨架，头尾固定、中间内容滚动、不显示滚动条。所有页面都用它。
 - `BottomBar`：页面底部的操作栏，放在 `PageLayout` 的 `#footer` 里，自动处理 safe-area。
+- `BottomSheet`：底部弹层（遮罩 + 滑入面板），`v-model:open` 控制。tabBar 页里用时要自己藏起 tabBar。
 
 ## 工作方式
 
