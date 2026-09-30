@@ -135,19 +135,27 @@ const bookings: Booking[] = (
 const blocks = new Set<string>()
 let seq = 100
 
-/** 模拟后端的定时任务：超过付款截止时间的 pending_payment 自动取消，释放时段 */
-function expireUnpaid() {
+/**
+ * 模拟后端的定时任务：
+ * - 超过付款截止时间的 pending_payment 自动取消，释放时段
+ * - 到了开始时间还没确认的 pending_confirm 自动取消，定金原路退回
+ */
+function autoCancel() {
   const now = Date.now()
   for (const b of bookings) {
     if (b.status === 'pending_payment' && b.payDeadline && Date.parse(b.payDeadline) <= now) {
       b.status = 'cancelled'
+      b.cancelReason = 'pay_timeout'
       delete b.payDeadline
+    } else if (b.status === 'pending_confirm' && isPast(b.date, b.time)) {
+      b.status = 'cancelled'
+      b.cancelReason = 'not_confirmed'
     }
   }
 }
 
 function getBookingOrThrow(id: ID) {
-  expireUnpaid()
+  autoCancel()
   return getOrThrow(bookings, id)
 }
 
@@ -159,7 +167,7 @@ function payParams(b: Booking) {
 }
 
 function findActive(artistId: ID, date: DateStr, time: TimeStr) {
-  expireUnpaid()
+  autoCancel()
   return bookings.find(b => b.artistId === artistId && b.date === date && b.time === time && ACTIVE.includes(b.status))
 }
 
@@ -289,7 +297,7 @@ export const mockApi: Api = {
   async listMyBookings(scope) {
     await delay()
     const upcoming = scope === 'upcoming'
-    expireUnpaid()
+    autoCancel()
     const wanted: BookingStatus[] = upcoming ? ACTIVE : ['completed', 'cancelled']
     return bookings
       .filter(b => wanted.includes(b.status))
@@ -303,6 +311,7 @@ export const mockApi: Api = {
     if (!ACTIVE.includes(b.status)) throw new ApiError('INVALID_STATE', '这个预约的状态已经变了')
     if (!out(b).canCancel) throw new ApiError('CANCEL_TOO_LATE', '距离开始不到 24 小时，需要取消请直接联系门店')
     b.status = 'cancelled'
+    b.cancelReason = 'customer'
     delete b.payDeadline
     return out(b)
   },
