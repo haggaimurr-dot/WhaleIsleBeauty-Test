@@ -291,12 +291,13 @@ export const mockApi: Api = {
       for (const a of artists) {
         const cell: ScheduleCell = { artistId: a.id, time, state: 'free' }
         const real = findActive(a.id, date, time)
-        if (real && real.status !== 'pending_payment') {
+        if (real) {
           const brief: OwnerBookingBrief = {
             id: real.id, customerName: me.nickname, serviceName: real.serviceName, status: real.status,
             alert: real.skinType === 'sensitive' ? '敏感肌' : undefined, note: real.note,
             canConfirm: real.status === 'pending_confirm' && !isPast(real.date, real.time),
           }
+          // pending_payment 也算占着：付款截止前为客人保留
           cell.state = real.status === 'pending_confirm' ? 'pending' : 'booked'
           cell.booking = brief
         } else if (takenByOthers(a.id, date, time)) {
@@ -314,7 +315,8 @@ export const mockApi: Api = {
         } else if (blocks.has(slotKey(a.id, date, time))) {
           cell.state = 'blocked'
         }
-        if (cell.state === 'booked' || cell.state === 'pending') stats.total++
+        const unpaid = cell.booking?.status === 'pending_payment'
+        if ((cell.state === 'booked' || cell.state === 'pending') && !unpaid) stats.total++
         if (cell.state === 'pending') stats.pending++
         if (cell.state === 'pending' && !cell.booking?.canConfirm) stats.stale++
         if (cell.state === 'free') stats.free++

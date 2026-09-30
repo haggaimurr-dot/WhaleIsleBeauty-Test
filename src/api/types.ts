@@ -211,6 +211,10 @@ export interface OwnerBookingBrief {
   canConfirm: boolean
 }
 
+/**
+ * 客人已下单但还没付定金（booking.status 为 pending_payment）的格子返回 booked：
+ * 时段在付款截止前为客人保留，店主不能设休息；它不计入 stats.total，超时后后端自动放出。
+ */
 export interface ScheduleCell {
   artistId: ID
   time: TimeStr

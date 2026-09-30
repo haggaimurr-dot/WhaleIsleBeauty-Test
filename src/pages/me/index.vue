@@ -114,6 +114,7 @@ import {
 } from '@/api'
 import { formatClock, formatDateCN, formatMonthDay } from '@/utils/date'
 import { formatPrice } from '@/utils/money'
+import { requestSubscribe } from '@/utils/subscribe'
 import { switchTab } from '@/utils/tab'
 import AppButton from '@/components/AppButton.vue'
 import ArchImage from '@/components/ArchImage.vue'
@@ -225,6 +226,8 @@ async function continuePay(b: Booking) {
   if (payingId.value) return
   payingId.value = b.id
   try {
+    // 和“付定金并预约”是同一个动作，同样请求订阅；已经同意过的再同意一次也不会多发
+    await requestSubscribe(['confirmed', 'reminder'])
     const paid = await payDeposit(await api.resumePayment(b.id))
     uni.navigateTo({ url: `/pages/booking/success?id=${paid.id}` })
   } catch (e) {
