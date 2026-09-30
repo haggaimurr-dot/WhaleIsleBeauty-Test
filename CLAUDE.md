@@ -17,7 +17,12 @@
 npm run dev:mp-weixin      # 开发，产物在 dist/dev/mp-weixin，用微信开发者工具导入
 npm run build:mp-weixin    # 构建
 npx vue-tsc --noEmit       # 类型检查，每完成一个任务都要跑一次并确保通过
+npm test                   # 单元测试（vitest），改了 api / mock / utils 都要跑
 ```
+
+测试放在旁边的 `__tests__/` 目录里，只测纯 TS 逻辑（mock 的业务规则、请求层、工具函数），不测页面。mock 每次调用有假延迟，用 `src/test/helpers.ts` 的 `freshMock()` 拿一份全新的 mock，假时钟会自动快进。改了业务规则（契约或 mock）时，先补测试再改。
+
+测试文件不参加 `vue-tsc` 类型检查（tsconfig 里排除了）：vitest 的类型会连带引入新版 `@types/node`，项目的 TypeScript 4.9 解析不了。测试由 vitest 运行时报错来保证。
 
 ## 设计参考
 
@@ -52,6 +57,7 @@ src/
     contract.ts    # Api 接口定义，注释里写了对应的 REST 路径
     mock.ts        # 内存 mock 实现
     http.ts        # 真实后端实现（将来接 Go 服务）
+    config.ts      # 真实后端的部署配置：云托管环境 ID、服务名、传输方式
     pay.ts         # 定金支付流程封装
     client.ts      # USE_MOCK 开关和 api 实例
     index.ts       # 统一出口，页面只从这里 import
@@ -63,6 +69,7 @@ src/
   components/      # 通用组件
   pages/           # 客人端页面
   pages-owner/     # 店主端分包
+  test/            # 测试工具（helpers.ts）
 ```
 
 ## 数据规则（重要）
