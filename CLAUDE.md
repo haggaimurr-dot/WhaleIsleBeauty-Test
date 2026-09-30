@@ -2,7 +2,7 @@
 
 私人化妆工作室的微信小程序。客人端用于看作品、预约、管理自己的预约；店主端用于排班和确认预约。两端在同一个小程序里，按用户角色显示入口。
 
-当前阶段是**演示版**：所有数据来自本地 mock，不接真实后端、不接真实支付。后端将来用 Go 实现，部署在**微信云托管**，前端通过 `wx.cloud.callContainer` 调用（见 `src/api/http.ts`），接口契约已经定义在 `src/api/contract.ts`。后端仓库在 `D:\proj\jingyu-api`（GitHub `haggaimurr-dot/WhaleIsleBeauty-API`），以这里的契约为准实现；改契约时两边都要跟着改。
+当前阶段是**演示版**：所有数据来自本地 mock，不接真实后端、不接真实支付。后端将来用 Go 实现，部署在**微信云托管**，前端通过 `wx.cloud.callContainer` 调用（见 `src/api/http.ts`），接口契约已经定义在 `src/api/contract.ts`。后端代码在本仓库的 `server/` 目录，以这里的契约为准实现；改契约时两边都要跟着改。（`D:\proj\jingyu-api` / `haggaimurr-dot/WhaleIsleBeauty-API` 是之前另起的后端，已停用归档，不要再往里写。）
 
 ## 技术栈
 
