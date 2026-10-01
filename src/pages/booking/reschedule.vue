@@ -141,8 +141,8 @@ async function submit() {
   if (!artistId.value || !date.value || !time.value || saving.value) return
   saving.value = true
   try {
-    // 改期后店里要重新确认一次，再要一次“预约确认”；到店提醒原来订过的还在
-    await requestSubscribe(['confirmed'])
+    // 改期后店里要重新确认一次，再要一次“预约确认”；到店提醒也再要一次，原来那次可能已经用掉了
+    await requestSubscribe(['confirmed', 'reminder'])
     await api.rescheduleBooking(bookingId, { artistId: artistId.value, date: date.value, time: time.value })
     uni.showToast({ title: '改好了，等店里确认', icon: 'none', duration: 1500 })
     setTimeout(() => uni.navigateBack(), 1500)
