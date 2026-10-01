@@ -56,6 +56,7 @@ src/
   api/
     types.ts       # 所有数据类型，前后端共用的契约
     contract.ts    # Api 接口定义，注释里写了对应的 REST 路径
+    catalog.ts     # 店主维护资料的字段规则（clean / validate），和 server/catalog.go 一致
     mock.ts        # 内存 mock 实现
     http.ts        # 真实后端实现（将来接 Go 服务）
     config.ts      # 真实后端的部署配置：云托管环境 ID、服务名、传输方式
@@ -99,6 +100,8 @@ src/
 | pages/me/index | 我的预约 | 我的预约 |
 | pages/me/skin | 肤质档案（普通页面，从“我的”进入） | 无（原型只有入口，按预约页表单样式做） |
 | pages-owner/schedule/index | 店主排班（分包） | 排班 |
+| pages-owner/catalog/index | 门店资料（分包，从“我的”进入，仅店主） | 无（按肤质档案页的表单样式做） |
+| pages-owner/catalog/shop | 门店信息编辑 | 无 |
 
 TabBar 包含首页、作品、预约、我的，使用 `pages.json` 的原生 tabBar。图标需要 PNG 格式（81×81），放在 `static/tab/`。
 

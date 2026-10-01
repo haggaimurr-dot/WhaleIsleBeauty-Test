@@ -56,7 +56,9 @@
         },
         "usingComponents" : true,
         /* 让父组件传给 virtualHost 组件的 class/style 合并到组件根节点上 */
-        "mergeVirtualHostAttributes" : true
+        "mergeVirtualHostAttributes" : true,
+        /* 店主在“门店信息”里用地图选门店位置 */
+        "requiredPrivateInfos" : [ "chooseLocation" ]
     },
     "mp-alipay" : {
         "usingComponents" : true
