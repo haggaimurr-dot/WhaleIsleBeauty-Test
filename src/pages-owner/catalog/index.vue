@@ -1,7 +1,7 @@
 <template>
   <PageLayout>
     <template #header>
-      <view class="psub">客人在小程序里看到的门店信息都在这里改。改了马上生效，已经下的单不受影响。</view>
+      <view class="psub">客人在小程序里看到的门店信息和化妆师都在这里改。改了马上生效，已经下的单不受影响。</view>
     </template>
 
     <view v-if="status === 'error'" class="panel">
@@ -19,14 +19,25 @@
         </view>
         <text class="card__go">修改</text>
       </view>
+
+      <view class="h">店里的资料</view>
+      <view class="menu">
+        <view class="menu__row" hover-class="menu__row--hover" @tap="openArtists">
+          <view class="menu__main">
+            化妆师
+            <view class="menu__sub">{{ artistNames }}</view>
+          </view>
+          <text class="menu__hint">{{ artists.length }} 位</text>
+        </view>
+      </view>
     </template>
   </PageLayout>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { api, errorText, ApiError, type Shop } from '@/api'
+import { api, errorText, ApiError, type Artist, type Shop } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import PageLayout from '@/components/PageLayout.vue'
 
@@ -34,6 +45,8 @@ const status = ref<'loading' | 'ok' | 'error'>('loading')
 const errorMsg = ref('')
 const forbidden = ref(false)
 const shop = ref<Shop>()
+const artists = ref<Artist[]>([])
+const artistNames = computed(() => artists.value.map(a => a.name).join('、'))
 
 async function load() {
   // 已经有数据时（从编辑页返回）不清空，避免闪一下
@@ -42,7 +55,7 @@ async function load() {
     // 先确认是店主：资料本身客人也能读，这里提前挡住，免得进到编辑页才报错
     const me = await api.getMe()
     if (me.role !== 'owner') throw new ApiError('FORBIDDEN', '')
-    shop.value = await api.getShop()
+    ;[shop.value, artists.value] = await Promise.all([api.getShop(), api.listArtists()])
     status.value = 'ok'
   } catch (e) {
     forbidden.value = e instanceof ApiError && e.code === 'FORBIDDEN'
@@ -54,6 +67,7 @@ async function load() {
 onShow(load)
 
 const openShop = () => uni.navigateTo({ url: '/pages-owner/catalog/shop' })
+const openArtists = () => uni.navigateTo({ url: '/pages-owner/catalog/artists' })
 </script>
 
 <style lang="scss">
@@ -106,6 +120,51 @@ const openShop = () => uni.navigateTo({ url: '/pages-owner/catalog/shop' })
     flex: none;
     font-size: $fs-small;
     color: $mocha;
+  }
+}
+
+.menu {
+  margin: 0 $page-x 40rpx;
+  border-radius: $r-card;
+  background: $card;
+  overflow: hidden;
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: $gap;
+    padding: 30rpx 32rpx;
+    border-bottom: 2rpx solid $hair;
+    font-size: $fs-body;
+    color: $ink;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &--hover {
+      background: $milk;
+    }
+  }
+
+  &__main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__sub {
+    margin-top: 4rpx;
+    font-size: $fs-caption;
+    color: $mute;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  &__hint {
+    flex: none;
+    font-size: $fs-small;
+    color: $mute;
   }
 }
 

@@ -102,6 +102,8 @@ src/
 | pages-owner/schedule/index | 店主排班（分包） | 排班 |
 | pages-owner/catalog/index | 门店资料（分包，从“我的”进入，仅店主） | 无（按肤质档案页的表单样式做） |
 | pages-owner/catalog/shop | 门店信息编辑 | 无 |
+| pages-owner/catalog/artists | 化妆师列表 | 无 |
+| pages-owner/catalog/artist | 添加 / 修改化妆师（query 带 `id` 时是修改） | 无 |
 
 TabBar 包含首页、作品、预约、我的，使用 `pages.json` 的原生 tabBar。图标需要 PNG 格式（81×81），放在 `static/tab/`。
 
