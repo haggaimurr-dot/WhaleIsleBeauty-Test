@@ -315,3 +315,26 @@ func (s *mysqlStore) RemoveBlock(ctx context.Context, artistID, date, t string) 
 	_, err := s.db.ExecContext(ctx, `DELETE FROM blocks WHERE slot_key = ?`, slotKey(artistID, date, t))
 	return err
 }
+
+// ---------- 订阅消息发送记录 ----------
+
+func (s *mysqlStore) ClaimNotice(ctx context.Context, key, bookingID, kind string, at time.Time) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`INSERT IGNORE INTO notices (notice_key, booking_id, kind, result, created_at) VALUES (?, ?, ?, '', ?)`,
+		key, bookingID, kind, at.UTC())
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
+}
+
+func (s *mysqlStore) FinishNotice(ctx context.Context, key, result string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE notices SET result = ?, finished_at = ? WHERE notice_key = ?`, result, time.Now().UTC(), key)
+	return err
+}
+
+func (s *mysqlStore) ReleaseNotice(ctx context.Context, key string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM notices WHERE notice_key = ?`, key)
+	return err
+}

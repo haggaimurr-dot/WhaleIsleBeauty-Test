@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"log"
@@ -76,6 +77,21 @@ func (a *App) Routes() http.Handler {
 
 	// 云托管的健康检查
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
+
+	// 外部定时器补发到店提醒（服务缩到 0 个实例时内置定时器不跑）。不经过小程序，靠口令保护
+	if a.cronToken != "" {
+		mux.HandleFunc("POST /cron/reminders", func(w http.ResponseWriter, r *http.Request) {
+			if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Cron-Token")), []byte(a.cronToken)) != 1 {
+				writeErr(w, r, errForbidden)
+				return
+			}
+			if err := a.Sweep(r.Context()); err != nil {
+				writeErr(w, r, err)
+				return
+			}
+			reply(w, r, struct{}{}, a.SendReminders(r.Context()))
+		})
+	}
 
 	// ---------- 登录和我的 ----------
 	me := func(w http.ResponseWriter, r *http.Request) {

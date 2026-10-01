@@ -79,6 +79,8 @@ type App struct {
 	fakePay bool            // 还没有商户号：不调微信支付，由 /fake-paid 模拟回调
 	// fakePayers 能调 /fake-paid 的 openid（店主 + 测试人员）。别的客人调会被拒绝，防止不付钱就约上
 	fakePayers map[string]bool
+	notifier   Notifier // 发订阅消息；nil 时不发
+	cronToken  string   // 外部定时器调 /cron/reminders 用的口令；空表示不开放
 }
 
 func newID(prefix string) string {
@@ -693,7 +695,7 @@ func (a *App) ConfirmBooking(ctx context.Context, u *User, id string) (Booking, 
 		}
 		return Booking{}, err
 	}
-	// TODO: 发“预约确认”订阅消息
+	a.notify(ctx, b, noticeConfirmed, a.confirmedMsg)
 	return a.out(b), nil
 }
 

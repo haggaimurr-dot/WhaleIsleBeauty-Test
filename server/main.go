@@ -10,6 +10,11 @@
 //	OWNER_OPENIDS   店主的 openid，多个用逗号分隔
 //	PAY_MODE        必须显式设置。fake：还没有商户号时联调用，不收钱；wxpay：微信支付（还没实现）
 //	FAKE_PAY_OPENIDS  PAY_MODE=fake 时，除店主外还能用假支付的测试人员 openid，逗号分隔
+//	SUBSCRIBE_MSG   订阅消息怎么发。wx：走云托管开放接口服务（连 MySQL 时默认）；log：只打日志（STORE=memory 时默认）
+//	                用 wx 要在云托管控制台“云调用 → 微信令牌权限配置”里加上 /cgi-bin/message/subscribe/send
+//	MINIPROGRAM_STATE  客人点消息打开哪个版本：formal（默认）/ trial（体验版）/ developer（开发版）
+//	CRON_TOKEN      设了才开放 POST /cron/reminders，请求头 X-Cron-Token 要等于它。
+//	                服务最小副本数为 0 时进程会被停掉，内置的每分钟定时器不跑，可以用外部定时器调这个接口补发提醒
 //
 // 假支付会让预约不付钱就变成“已付定金”，正式开放给客人之前必须换成 wxpay。
 // 为了防止忘记，PAY_MODE 没有默认值；fake 模式下也只有店主和 FAKE_PAY_OPENIDS 里的人能用。
@@ -64,19 +69,45 @@ func main() {
 		fakePayers[id] = true
 	}
 
-	app := &App{store: store, now: time.Now, owners: owners, fakePay: true, fakePayers: fakePayers}
+	msgMode := env("SUBSCRIBE_MSG", "wx")
+	if env("STORE", "") == "memory" {
+		msgMode = env("SUBSCRIBE_MSG", "log")
+	}
+	var notifier Notifier
+	switch msgMode {
+	case "wx":
+		notifier = &wxNotifier{
+			base:   env("WX_API_BASE", "http://api.weixin.qq.com"),
+			state:  env("MINIPROGRAM_STATE", "formal"),
+			client: &http.Client{Timeout: 10 * time.Second},
+		}
+	case "log":
+		log.Print("SUBSCRIBE_MSG=log：订阅消息只打日志，不发给客人")
+		notifier = logNotifier{}
+	default:
+		log.Fatalf("SUBSCRIBE_MSG=%s 不认识，只支持 wx / log", msgMode)
+	}
 
-	// 实例活着的时候每分钟也流转一次；每个请求前还会再跑一次
+	app := &App{
+		store: store, now: time.Now, owners: owners, fakePay: true, fakePayers: fakePayers,
+		notifier: notifier, cronToken: os.Getenv("CRON_TOKEN"),
+	}
+
+	// 定时任务：实例活着的时候每分钟流转一次预约（每个请求前也会跑），顺便发到店提醒
 	go func() {
 		for range time.Tick(time.Minute) {
-			if err := app.Sweep(context.Background()); err != nil {
+			ctx := context.Background()
+			if err := app.Sweep(ctx); err != nil {
 				log.Printf("sweep: %v", err)
+			}
+			if err := app.SendReminders(ctx); err != nil {
+				log.Printf("reminders: %v", err)
 			}
 		}
 	}()
 
 	addr := ":" + env("PORT", "80")
-	log.Printf("listening on %s, owners=%d, pay=%s, fakePayers=%d", addr, len(owners), payMode, len(fakePayers))
+	log.Printf("listening on %s, owners=%d, pay=%s, fakePayers=%d, msg=%s", addr, len(owners), payMode, len(fakePayers), msgMode)
 	srv := &http.Server{Addr: addr, Handler: logRequests(app.Routes()), ReadHeaderTimeout: 10 * time.Second}
 	log.Fatal(srv.ListenAndServe())
 }

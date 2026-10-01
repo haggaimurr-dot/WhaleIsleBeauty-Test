@@ -78,6 +78,13 @@ type Store interface {
 	BlocksOn(ctx context.Context, date string) (map[string]bool, error)
 	AddBlock(ctx context.Context, artistID, date, t string) error
 	RemoveBlock(ctx context.Context, artistID, date, t string) error
+
+	// ClaimNotice 占一条订阅消息的发送记录；已经有了返回 false（发过或者别的实例正在发）
+	ClaimNotice(ctx context.Context, key, bookingID, kind string, at time.Time) (bool, error)
+	// FinishNotice 记下发送结果：sent，或者微信返回的错误
+	FinishNotice(ctx context.Context, key, result string) error
+	// ReleaseNotice 删掉占位，下次可以重发
+	ReleaseNotice(ctx context.Context, key string) error
 }
 
 func isDue(b *BookingRow, now time.Time) bool {
@@ -98,11 +105,12 @@ type memStore struct {
 	mu       sync.Mutex
 	users    map[string]*User // by id
 	bookings map[string]*BookingRow
-	blocks   map[string]bool // slotKey
+	blocks   map[string]bool   // slotKey
+	notices  map[string]string // noticeKey → 结果，"" 表示正在发
 }
 
 func newMemStore() *memStore {
-	return &memStore{users: map[string]*User{}, bookings: map[string]*BookingRow{}, blocks: map[string]bool{}}
+	return &memStore{users: map[string]*User{}, bookings: map[string]*BookingRow{}, blocks: map[string]bool{}, notices: map[string]string{}}
 }
 
 func cloneBooking(b *BookingRow) *BookingRow { c := *b; return &c }
@@ -268,5 +276,29 @@ func (s *memStore) RemoveBlock(_ context.Context, artistID, date, t string) erro
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.blocks, slotKey(artistID, date, t))
+	return nil
+}
+
+func (s *memStore) ClaimNotice(_ context.Context, key, _, _ string, _ time.Time) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.notices[key]; ok {
+		return false, nil
+	}
+	s.notices[key] = ""
+	return true, nil
+}
+
+func (s *memStore) FinishNotice(_ context.Context, key, result string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.notices[key] = result
+	return nil
+}
+
+func (s *memStore) ReleaseNotice(_ context.Context, key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.notices, key)
 	return nil
 }
