@@ -84,7 +84,9 @@ export type Role = 'customer' | 'owner'
 
 export interface Me {
   id: ID
+  /** 微信不再提供昵称：首次登录时后端随机生成，例如“柚子27”（一个温和的小词 + 两位数字），之后不变 */
   nickname: string
+  /** 同上，首次登录时从 placeholder:g1–g6 里随机选一个，ArchImage 画成拱形 */
   avatar: string
   role: Role
   /**

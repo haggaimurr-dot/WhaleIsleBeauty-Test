@@ -497,3 +497,31 @@ func TestMigrationsEmbedded(t *testing.T) {
 		t.Fatal("002 应该把 active_slot 改成生成列并加唯一索引")
 	}
 }
+
+// 新客人注册时随机给昵称（温和的小词 + 两位数字）和头像（g1–g6 渐变之一），之后登录不变
+func TestRandomNicknameAndAvatar(t *testing.T) {
+	a, _ := newTestApp(t)
+	words := set(nicknameWords...)
+	avatars := set(avatarChoices...)
+	seenNames, seenAvatars := map[string]bool{}, map[string]bool{}
+	for i := 0; i < 60; i++ {
+		u := user(t, a, fmt.Sprintf("o-r%d", i))
+		r := []rune(u.Nickname)
+		if len(r) != 4 || !words[string(r[:2])] || r[2] < '0' || r[2] > '9' || r[3] < '0' || r[3] > '9' {
+			t.Fatalf("昵称格式不对: %q", u.Nickname)
+		}
+		if !avatars[u.Avatar] {
+			t.Fatalf("头像不在可选范围: %q", u.Avatar)
+		}
+		seenNames[u.Nickname], seenAvatars[u.Avatar] = true, true
+		// 再登录一次不会换
+		again := user(t, a, fmt.Sprintf("o-r%d", i))
+		if again.Nickname != u.Nickname || again.Avatar != u.Avatar {
+			t.Fatalf("再次登录换了昵称或头像: %+v → %+v", u, again)
+		}
+	}
+	// 随机：60 个人里不会全是同一个
+	if len(seenNames) < 10 || len(seenAvatars) < 3 {
+		t.Fatalf("不够随机: %d 个昵称, %d 种头像", len(seenNames), len(seenAvatars))
+	}
+}
