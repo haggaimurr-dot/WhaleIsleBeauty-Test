@@ -24,7 +24,7 @@
 
       <view v-else-if="service" class="body">
         <view class="title">{{ service.name }}</view>
-        <view class="meta">约 {{ service.durationMin }} 分钟　已有 {{ service.bookedCount }} 位客人选择</view>
+        <view class="meta">约 {{ service.durationMin }} 分钟<text v-if="service.bookedCount">　已有 {{ service.bookedCount }} 位客人选择</text></view>
 
         <view class="tags">
           <text v-for="t in service.tags" :key="t" class="tag">{{ t }}</text>
@@ -45,7 +45,11 @@
       </view>
 
       <template #footer>
-        <BottomBar v-if="service" :desc="`定金 ${formatPrice(service.deposit)}，到店付尾款`">
+        <!-- 店主下架了：分享出去的链接还能打开，但不能约，引导去看别的项目 -->
+        <BottomBar v-if="service?.hidden" title="这个项目暂时不接预约" desc="看看别的项目，或者联系门店问问">
+          <AppButton variant="ghost" @click="toHome">看看别的</AppButton>
+        </BottomBar>
+        <BottomBar v-else-if="service" :desc="`定金 ${formatPrice(service.deposit)}，到店付尾款`">
           <template #title>
             <text class="price">{{ formatPrice(service.price) }}</text>
             <text v-if="service.priceFrom" class="price__from">起</text>
@@ -131,6 +135,8 @@ function onSwipe(e: { detail: { current: number } }) {
 const toBooking = () => {
   if (service.value) switchTab('booking', { serviceId: service.value.id })
 }
+
+const toHome = () => switchTab('home')
 </script>
 
 <style lang="scss">

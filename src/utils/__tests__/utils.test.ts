@@ -1,7 +1,7 @@
 /** 工具函数：日期、金额、分享、订阅消息 */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { addMinutes, datesFromToday, dayLabel, formatClock, formatDateCN, upcomingDates } from '@/utils/date'
-import { formatPrice } from '@/utils/money'
+import { centsToYuanInput, formatPrice, parseYuan } from '@/utils/money'
 import { shareImage, sharePath } from '@/utils/share'
 import { requestSubscribe, SUBSCRIBE_TEMPLATES } from '@/utils/subscribe'
 import { useMockClock } from '@/test/helpers'
@@ -35,6 +35,20 @@ describe('money', () => {
     expect(formatPrice(12850)).toBe('¥128.5')
     expect(formatPrice(12805)).toBe('¥128.05')
     expect(formatPrice(128000, { from: true })).toBe('¥1280 起')
+  })
+
+  it('店主填的元转分：最多两位小数，认不出的返回 NaN', () => {
+    expect(parseYuan('298')).toBe(29800)
+    expect(parseYuan(' 128.5 ')).toBe(12850)
+    expect(parseYuan('0.1')).toBe(10)
+    expect(parseYuan('19.99')).toBe(1999) // 不能有浮点误差
+    for (const bad of ['', '¥298', '1.234', 'abc', '-5', '.5']) expect(parseYuan(bad)).toBeNaN()
+  })
+
+  it('分转回输入框里的元', () => {
+    expect(centsToYuanInput(29800)).toBe('298')
+    expect(centsToYuanInput(12850)).toBe('128.5')
+    expect(centsToYuanInput(1999)).toBe('19.99')
   })
 })
 

@@ -1,7 +1,7 @@
 <template>
   <PageLayout>
     <template #header>
-      <view class="psub">客人在小程序里看到的门店信息和化妆师都在这里改。改了马上生效，已经下的单不受影响。</view>
+      <view class="psub">客人在小程序里看到的门店信息、化妆师和项目都在这里改。改了马上生效，已经下的单不受影响。</view>
     </template>
 
     <view v-if="status === 'error'" class="panel">
@@ -29,6 +29,13 @@
           </view>
           <text class="menu__hint">{{ artists.length }} 位</text>
         </view>
+        <view class="menu__row" hover-class="menu__row--hover" @tap="openServices">
+          <view class="menu__main">
+            项目
+            <view class="menu__sub">{{ serviceSub }}</view>
+          </view>
+          <text class="menu__hint">{{ services.length }} 个</text>
+        </view>
       </view>
     </template>
   </PageLayout>
@@ -37,7 +44,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { api, errorText, ApiError, type Artist, type Shop } from '@/api'
+import { api, errorText, ApiError, type Artist, type Service, type Shop } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import PageLayout from '@/components/PageLayout.vue'
 
@@ -47,6 +54,12 @@ const forbidden = ref(false)
 const shop = ref<Shop>()
 const artists = ref<Artist[]>([])
 const artistNames = computed(() => artists.value.map(a => a.name).join('、'))
+const services = ref<Service[]>([])
+const serviceSub = computed(() => {
+  const hidden = services.value.filter(s => s.hidden).length
+  const onSale = services.value.length - hidden
+  return hidden ? `${onSale} 个在接预约，${hidden} 个已下架` : '都在接预约'
+})
 
 async function load() {
   // 已经有数据时（从编辑页返回）不清空，避免闪一下
@@ -55,7 +68,7 @@ async function load() {
     // 先确认是店主：资料本身客人也能读，这里提前挡住，免得进到编辑页才报错
     const me = await api.getMe()
     if (me.role !== 'owner') throw new ApiError('FORBIDDEN', '')
-    ;[shop.value, artists.value] = await Promise.all([api.getShop(), api.listArtists()])
+    ;[shop.value, artists.value, services.value] = await Promise.all([api.getShop(), api.listArtists(), api.listOwnerServices()])
     status.value = 'ok'
   } catch (e) {
     forbidden.value = e instanceof ApiError && e.code === 'FORBIDDEN'
@@ -68,6 +81,7 @@ onShow(load)
 
 const openShop = () => uni.navigateTo({ url: '/pages-owner/catalog/shop' })
 const openArtists = () => uni.navigateTo({ url: '/pages-owner/catalog/artists' })
+const openServices = () => uni.navigateTo({ url: '/pages-owner/catalog/services' })
 </script>
 
 <style lang="scss">

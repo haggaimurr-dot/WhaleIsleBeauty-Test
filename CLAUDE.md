@@ -65,7 +65,7 @@ src/
     index.ts       # 统一出口，页面只从这里 import
   utils/
     date.ts        # 日期格式化工具
-    money.ts       # 金额格式化（分 → 元）
+    money.ts       # 金额格式化（分 → 元）和店主输入的元 → 分
   styles/
     tokens.scss    # 设计变量
   components/      # 通用组件
@@ -104,6 +104,8 @@ src/
 | pages-owner/catalog/shop | 门店信息编辑 | 无 |
 | pages-owner/catalog/artists | 化妆师列表 | 无 |
 | pages-owner/catalog/artist | 添加 / 修改化妆师（query 带 `id` 时是修改） | 无 |
+| pages-owner/catalog/services | 项目列表（含已下架） | 无 |
+| pages-owner/catalog/service | 添加 / 修改项目，可下架（query 带 `id` 时是修改） | 无 |
 
 TabBar 包含首页、作品、预约、我的，使用 `pages.json` 的原生 tabBar。图标需要 PNG 格式（81×81），放在 `static/tab/`。
 
