@@ -25,6 +25,8 @@ type Service struct {
 	Cover       string   `json:"cover"`
 	Images      []string `json:"images"`
 	BookedCount int      `json:"bookedCount"`
+	// Hidden 已下架：客人看不到、不能新约。只有店主接口和 GET /services/:id 会返回下架的项目
+	Hidden bool `json:"hidden,omitempty"`
 }
 
 type Work struct {

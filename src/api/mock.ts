@@ -7,8 +7,9 @@ import {
   ApiError, type Artist, type Booking, type BookingStatus, type CreateBookingReq,
   type DateStr, type DaySchedule, type ID, type Me, type OwnerBookingBrief,
   type ScheduleCell, type Service, type Shop, type SkinProfile, type SkinType, type SlotView,
-  type TimeStr, type UpdateSkinProfileReq, type Work, type Occasion, TONE_LABEL,
+  type TimeStr, type UpdateSkinProfileReq, type Work, type WorkInput, type Occasion, TONE_LABEL,
 } from './types'
+import { cleanArtist, cleanService, cleanShop, cleanWork, validateArtist, validateService, validateShop, validateWork } from './catalog'
 import { upcomingDates, datesFromToday, toTimestamp, hoursUntil, todayStr, nowTimeStr } from '../utils/date'
 
 // ---------- 种子数据 ----------
@@ -64,7 +65,7 @@ const works: Work[] = [
 ]
 
 /** 地址取自原型；电话和坐标是演示用的假数据 */
-const shop: Shop = {
+let shop: Shop = {
   name: '鲸屿美妆', address: '蓝山CBD 3329', phone: '020-0000-0000', openHours: '09:00–21:00',
   latitude: 23.1291, longitude: 113.2644,
 }
@@ -216,6 +217,35 @@ function requireOwner() {
   if (me.role !== 'owner') throw new ApiError('FORBIDDEN', '只有店主可以进行这个操作')
 }
 
+// ---------- 资料维护 ----------
+
+function indexOrThrow<T extends { id: ID }>(list: T[], id: ID): number {
+  const i = list.findIndex(x => x.id === id)
+  if (i < 0) throw new ApiError('NOT_FOUND', '没有找到这条信息')
+  return i
+}
+
+/** 不符合规则时和后端一样返回 400 UNKNOWN，message 说明哪里不对 */
+function checked<T>(v: T, validate: (v: T) => string | undefined): T {
+  const msg = validate(v)
+  if (msg) throw new ApiError('UNKNOWN', msg)
+  return v
+}
+
+function checkWork(req: WorkInput): WorkInput {
+  const w = checked(cleanWork(req), validateWork)
+  if (!artists.some(a => a.id === w.artistId)) throw new ApiError('UNKNOWN', '选的化妆师不在了，换一位吧')
+  if (w.serviceId && !services.some(s => s.id === w.serviceId)) throw new ApiError('UNKNOWN', '关联的项目不在了，换一个吧')
+  return w
+}
+
+/** 下架或删掉 id 之后，至少还要有一个在接预约的项目，不然客人没法约 */
+function requireAnotherOnSale(id: ID) {
+  if (!services.some(s => s.id !== id && !s.hidden)) {
+    throw new ApiError('INVALID_STATE', '至少要留一个在接预约的项目')
+  }
+}
+
 /** mock 专用：模拟微信支付回调。真实环境由微信支付通知后端完成状态变更。 */
 export async function __simulatePaid(id: ID) {
   await delay(600)
@@ -246,11 +276,15 @@ export const mockApi: Api = {
   },
 
   async listArtists() { await delay(); return clone(artists) },
-  async listServices() { await delay(); return clone(services) },
+  async listServices() { await delay(); return clone(services.filter(s => !s.hidden)) },
   async getService(id) { await delay(); return clone(getOrThrow(services, id)) },
   async listWorks(category) {
     await delay()
-    return clone(category ? works.filter(w => w.category === category) : works)
+    return clone(category ? works.filter(w => w.category === category) : works).map(w => {
+      // 关联的项目下架了就不带，“预约同款”不预选
+      if (w.serviceId && services.find(s => s.id === w.serviceId)?.hidden) delete w.serviceId
+      return w
+    })
   },
   async listBookableDates() { await delay(100); return upcomingDates(7) },
   async getShop() { await delay(100); return clone(shop) },
@@ -265,6 +299,7 @@ export const mockApi: Api = {
   async createBooking(req: CreateBookingReq) {
     await delay(500)
     const service = getOrThrow(services, req.serviceId)
+    if (service.hidden) throw new ApiError('INVALID_STATE', '这个项目暂时不接预约了，看看别的吧')
     getOrThrow(artists, req.artistId)
     if (!isAvailable(req.artistId, req.date, req.time)) {
       throw new ApiError('SLOT_TAKEN', '这个时间刚被约走了，换一个时间吧')
@@ -418,5 +453,99 @@ export const mockApi: Api = {
     requireOwner()
     if (isPast(date, time)) throw new ApiError('INVALID_STATE', '这个时段已经过去了')
     blocks.delete(slotKey(artistId, date, time))
+  },
+
+  async updateShop(req) {
+    await delay(400)
+    requireOwner()
+    shop = checked(cleanShop(req), validateShop)
+    return clone(shop)
+  },
+
+  async createArtist(req) {
+    await delay(400)
+    requireOwner()
+    const a: Artist = { id: `a${++seq}`, ...checked(cleanArtist(req), validateArtist) }
+    artists.push(a)
+    return clone(a)
+  },
+  async updateArtist(id, req) {
+    await delay(400)
+    requireOwner()
+    const i = indexOrThrow(artists, id)
+    artists[i] = { id, ...checked(cleanArtist(req), validateArtist) }
+    return clone(artists[i])
+  },
+  async deleteArtist(id) {
+    await delay(400)
+    requireOwner()
+    const i = indexOrThrow(artists, id)
+    autoCancel()
+    if (bookings.some(b => b.artistId === id && ACTIVE.includes(b.status))) {
+      throw new ApiError('INVALID_STATE', 'TA 还有没结束的预约，处理完再删')
+    }
+    const n = works.filter(w => w.artistId === id).length
+    if (n) throw new ApiError('INVALID_STATE', `TA 名下还有 ${n} 个作品，先改给别人或删掉`)
+    if (artists.length === 1) throw new ApiError('INVALID_STATE', '至少要留一位化妆师')
+    artists.splice(i, 1)
+  },
+
+  async listOwnerServices() {
+    await delay()
+    requireOwner()
+    return clone(services)
+  },
+  async createService(req) {
+    await delay(400)
+    requireOwner()
+    const s: Service = { id: `s${++seq}`, ...checked(cleanService(req), validateService), bookedCount: 0 }
+    services.push(s)
+    return clone(s)
+  },
+  async updateService(id, req) {
+    await delay(400)
+    requireOwner()
+    const i = indexOrThrow(services, id)
+    const next: Service = { id, ...checked(cleanService(req), validateService), bookedCount: services[i].bookedCount }
+    if (next.hidden && !services[i].hidden) requireAnotherOnSale(id)
+    services[i] = next
+    return clone(next)
+  },
+  async deleteService(id) {
+    await delay(400)
+    requireOwner()
+    const i = indexOrThrow(services, id)
+    autoCancel()
+    if (bookings.some(b => b.serviceId === id && ACTIVE.includes(b.status))) {
+      throw new ApiError('INVALID_STATE', '这个项目还有没结束的预约，可以先下架，等预约都结束了再删')
+    }
+    if (!services[i].hidden) requireAnotherOnSale(id)
+    services.splice(i, 1)
+    for (const w of works) if (w.serviceId === id) delete w.serviceId
+  },
+
+  async listOwnerWorks() {
+    await delay()
+    requireOwner()
+    return clone(works)
+  },
+  async createWork(req) {
+    await delay(400)
+    requireOwner()
+    const w: Work = { id: `w${++seq}`, ...checkWork(req) }
+    works.unshift(w)
+    return clone(w)
+  },
+  async updateWork(id, req) {
+    await delay(400)
+    requireOwner()
+    const i = indexOrThrow(works, id)
+    works[i] = { id, ...checkWork(req) }
+    return clone(works[i])
+  },
+  async deleteWork(id) {
+    await delay(300)
+    requireOwner()
+    works.splice(indexOrThrow(works, id), 1)
   },
 }

@@ -269,7 +269,7 @@ func TestOwnerSchedule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ds.Cells) != len(slotTimes)*len(artists) {
+	if len(ds.Cells) != len(slotTimes)*len(seedArtists) {
 		t.Fatalf("cells = %d", len(ds.Cells))
 	}
 	cell := func(artist, tm string) ScheduleCell {

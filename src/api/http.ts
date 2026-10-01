@@ -169,6 +169,19 @@ export const httpApi: Api = {
   confirmBooking: (id) => request('POST', `/owner/bookings/${id}/confirm`),
   blockSlot: (artistId, date, time) => request('PUT', '/owner/blocks', { artistId, date, time }),
   unblockSlot: (artistId, date, time) => request('DELETE', '/owner/blocks', { artistId, date, time }),
+
+  updateShop: (shop) => request('PUT', '/owner/shop', shop),
+  createArtist: (req) => request('POST', '/owner/artists', req),
+  updateArtist: (id, req) => request('PUT', `/owner/artists/${id}`, req),
+  deleteArtist: (id) => request('DELETE', `/owner/artists/${id}`),
+  listOwnerServices: () => request('GET', '/owner/services'),
+  createService: (req) => request('POST', '/owner/services', req),
+  updateService: (id, req) => request('PUT', `/owner/services/${id}`, req),
+  deleteService: (id) => request('DELETE', `/owner/services/${id}`),
+  listOwnerWorks: () => request('GET', '/owner/works'),
+  createWork: (req) => request('POST', '/owner/works', req),
+  updateWork: (id, req) => request('PUT', `/owner/works/${id}`, req),
+  deleteWork: (id) => request('DELETE', `/owner/works/${id}`),
 }
 
 /**

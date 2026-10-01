@@ -50,6 +50,10 @@ func openMySQL(addr, user, pass, dbName string) (*mysqlStore, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := seedCatalog(db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &mysqlStore{db: db}, nil
 }
 
@@ -337,4 +341,74 @@ func (s *mysqlStore) FinishNotice(ctx context.Context, key, result string) error
 func (s *mysqlStore) ReleaseNotice(ctx context.Context, key string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM notices WHERE notice_key = ?`, key)
 	return err
+}
+
+// ---------- 基础资料 ----------
+
+// seedCatalog 表是空的时候写入初始数据。多个实例同时启动也没关系：主键冲突的被 IGNORE 掉
+func seedCatalog(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM catalog`).Scan(&n); err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil
+	}
+	now := time.Now().UTC()
+	for _, it := range seedCatalogItems() {
+		if _, err := db.Exec(`INSERT IGNORE INTO catalog (kind, id, sort, data, updated_at) VALUES (?, ?, ?, ?, ?)`,
+			it.Kind, it.ID, it.Sort, it.Data, now); err != nil {
+			return fmt.Errorf("seed catalog: %w", err)
+		}
+	}
+	log.Print("catalog seeded")
+	return nil
+}
+
+func (s *mysqlStore) CatalogItems(ctx context.Context) ([]CatalogItem, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT kind, id, sort, data FROM catalog`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CatalogItem
+	for rows.Next() {
+		var it CatalogItem
+		if err := rows.Scan(&it.Kind, &it.ID, &it.Sort, &it.Data); err != nil {
+			return nil, err
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+func (s *mysqlStore) PutCatalogItem(ctx context.Context, it CatalogItem) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO catalog (kind, id, sort, data, updated_at) VALUES (?, ?, ?, ?, ?)
+		 ON DUPLICATE KEY UPDATE data = VALUES(data), updated_at = VALUES(updated_at)`,
+		it.Kind, it.ID, it.Sort, it.Data, time.Now().UTC())
+	return err
+}
+
+func (s *mysqlStore) DeleteCatalogItem(ctx context.Context, kind, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM catalog WHERE kind = ? AND id = ?`, kind, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *mysqlStore) ActiveBookingExists(ctx context.Context, artistID, serviceID string) (bool, error) {
+	col, id := "artist_id", artistID
+	if artistID == "" {
+		col, id = "service_id", serviceID
+	}
+	var n int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM bookings WHERE `+col+` = ? AND status IN (`+placeholders(len(activeStatuses))+`)`,
+		append([]any{id}, toArgs(activeStatuses)...)...).Scan(&n)
+	return n > 0, err
 }

@@ -1,7 +1,7 @@
 import type {
-  Artist, Booking, CreateBookingReq, CreateBookingResp, DateStr, DaySchedule,
-  ID, Me, RescheduleReq, Service, Shop, SkinProfile, SlotView, StyleCategory, TimeStr,
-  UpdateSkinProfileReq, Work,
+  Artist, ArtistInput, Booking, CreateBookingReq, CreateBookingResp, DateStr, DaySchedule,
+  ID, Me, RescheduleReq, Service, ServiceInput, Shop, SkinProfile, SlotView, StyleCategory, TimeStr,
+  UpdateSkinProfileReq, Work, WorkInput,
 } from './types'
 
 /**
@@ -40,11 +40,11 @@ export interface Api {
   // ---------- 基础资料 ----------
   /** GET /artists */
   listArtists(): Promise<Artist[]>
-  /** GET /services */
+  /** GET /services  不含已下架的 */
   listServices(): Promise<Service[]>
-  /** GET /services/:id */
+  /** GET /services/:id  已下架的也返回（带 hidden: true），分享出去的详情页还能打开 */
   getService(id: ID): Promise<Service>
-  /** GET /works?category= */
+  /** GET /works?category=  最新的在前。关联的项目已下架时不返回 serviceId，“预约同款”就不预选项目 */
   listWorks(category?: StyleCategory): Promise<Work[]>
   /** GET /dates  可预约的日期（从明天起），后端可据此处理节假日或闭店 */
   listBookableDates(): Promise<DateStr[]>
@@ -104,4 +104,43 @@ export interface Api {
   blockSlot(artistId: ID, date: DateStr, time: TimeStr): Promise<void>
   /** DELETE /owner/blocks  body: { artistId, date, time }  时段已过去返回 INVALID_STATE */
   unblockSlot(artistId: ID, date: DateStr, time: TimeStr): Promise<void>
+
+  // ---------- 资料维护（店主端，需要 owner 角色） ----------
+  // 提交的内容整份替换，字段限制见 catalog.ts 的 validateXxx，前后端用同一套规则；不符合返回 400 UNKNOWN，message 说明哪里不对。
+  // 已有预约里存的是下单时的项目名、价格、定金、时长和化妆师名，改资料不影响已经下的单。
+  // 图片字段演示阶段只用 placeholder:g1–g6，以后接云存储再放 fileID / URL。
+
+  /** PUT /owner/shop  返回保存后的门店信息 */
+  updateShop(shop: Shop): Promise<Shop>
+
+  /** POST /owner/artists  新的排在最后 */
+  createArtist(req: ArtistInput): Promise<Artist>
+  /** PUT /owner/artists/:id */
+  updateArtist(id: ID, req: ArtistInput): Promise<Artist>
+  /**
+   * DELETE /owner/artists/:id  以下情况返回 INVALID_STATE，message 说明原因：
+   * 还有没结束的预约；名下还有作品（先改给别人或删掉）；只剩这一位
+   */
+  deleteArtist(id: ID): Promise<void>
+
+  /** GET /owner/services  含已下架的，顺序和客人端一致 */
+  listOwnerServices(): Promise<Service[]>
+  /** POST /owner/services  新的排在最后。下架也走 update（hidden: true）；不能把最后一个在接预约的项目下架 */
+  createService(req: ServiceInput): Promise<Service>
+  /** PUT /owner/services/:id  改价只影响之后的新预约 */
+  updateService(id: ID, req: ServiceInput): Promise<Service>
+  /**
+   * DELETE /owner/services/:id  还有没结束的预约、或者是最后一个在接预约的项目时返回 INVALID_STATE。
+   * 删掉后关联它的作品不再带 serviceId
+   */
+  deleteService(id: ID): Promise<void>
+
+  /** GET /owner/works  全部作品，最新的在前；和客人端不同，下架项目的 serviceId 照常返回 */
+  listOwnerWorks(): Promise<Work[]>
+  /** POST /owner/works  新的排在最前 */
+  createWork(req: WorkInput): Promise<Work>
+  /** PUT /owner/works/:id */
+  updateWork(id: ID, req: WorkInput): Promise<Work>
+  /** DELETE /owner/works/:id */
+  deleteWork(id: ID): Promise<void>
 }

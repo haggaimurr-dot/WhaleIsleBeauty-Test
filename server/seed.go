@@ -1,16 +1,16 @@
 package main
 
-// 基础资料。和前端 mock.ts 保持一致，以后有了店主后台再挪进数据库。
+// 基础资料的初始数据，和前端 mock.ts 保持一致。第一次启动时写进 catalog 表，之后由店主在小程序里维护（catalog.go）。
 
 var slotTimes = []string{"09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00", "19:30"}
 
-var artists = []Artist{
+var seedArtists = []Artist{
 	{ID: "a1", Name: "小鲸", Title: "主理人", Years: 8, Avatar: "placeholder:g1"},
 	{ID: "a2", Name: "安安", Years: 6, Specialty: "擅长新娘", Avatar: "placeholder:g4"},
 	{ID: "a3", Name: "七七", Years: 4, Specialty: "擅长日常", Avatar: "placeholder:g3"},
 }
 
-var services = []Service{
+var seedServices = []Service{
 	{
 		ID: "s1", Name: "韩式上镜妆（含发型）", Summary: "适合拍照、证件照", Category: "camera",
 		DurationMin: 90, Price: 29800, Deposit: 5000,
@@ -41,7 +41,7 @@ var services = []Service{
 	},
 }
 
-var works = []Work{
+var seedWorks = []Work{
 	{ID: "w1", Title: "氧气上镜妆", Category: "camera", ArtistID: "a1", ServiceID: "s1", Image: "placeholder:g2", Ratio: 1.25, DurationText: "约 90 分钟"},
 	{ID: "w2", Title: "清透约会妆", Category: "date", ArtistID: "a3", ServiceID: "s2", Image: "placeholder:g4", Ratio: 1.5, DurationText: "约 60 分钟"},
 	{ID: "w3", Title: "中式新娘妆", Category: "bridal", ArtistID: "a2", ServiceID: "s3", Image: "placeholder:g3", Ratio: 1.6, DurationText: "需提前沟通"},
@@ -53,27 +53,9 @@ var works = []Work{
 }
 
 // 地址取自原型；电话和坐标是演示用的假数据
-var shop = Shop{
+var seedShop = Shop{
 	Name: "鲸屿美妆", Address: "蓝山CBD 3329", Phone: "020-0000-0000", OpenHours: "09:00–21:00",
 	Latitude: 23.1291, Longitude: 113.2644,
-}
-
-func findArtist(id string) *Artist {
-	for i := range artists {
-		if artists[i].ID == id {
-			return &artists[i]
-		}
-	}
-	return nil
-}
-
-func findService(id string) *Service {
-	for i := range services {
-		if services[i].ID == id {
-			return &services[i]
-		}
-	}
-	return nil
 }
 
 func isSlotTime(t string) bool {

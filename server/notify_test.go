@@ -126,7 +126,7 @@ func TestReminders(t *testing.T) {
 	}
 	m := got[0]
 	if m.ToUser != "o-alice" || m.TemplateID != tmplReminder || val(m, "thing1") != "韩式上镜妆（含发型）" ||
-		val(m, "time3") != "2026年10月02日 10:30" || val(m, "thing6") != shop.Address || val(m, "thing5") != "明天见，素颜过来就好" {
+		val(m, "time3") != "2026年10月02日 10:30" || val(m, "thing6") != seedShop.Address || val(m, "thing5") != "明天见，素颜过来就好" {
 		t.Fatalf("unexpected %+v", m)
 	}
 

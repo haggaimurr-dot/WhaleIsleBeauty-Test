@@ -117,27 +117,27 @@ func (a *App) Routes() http.Handler {
 	})
 
 	// ---------- 基础资料 ----------
-	h("GET /v1/artists", func(w http.ResponseWriter, r *http.Request) { reply(w, r, artists, nil) })
-	h("GET /v1/services", func(w http.ResponseWriter, r *http.Request) { reply(w, r, services, nil) })
+	h("GET /v1/artists", func(w http.ResponseWriter, r *http.Request) {
+		v, err := a.Artists(r.Context())
+		reply(w, r, v, err)
+	})
+	h("GET /v1/services", func(w http.ResponseWriter, r *http.Request) {
+		v, err := a.Services(r.Context())
+		reply(w, r, v, err)
+	})
 	h("GET /v1/services/{id}", func(w http.ResponseWriter, r *http.Request) {
-		if s := findService(r.PathValue("id")); s != nil {
-			reply(w, r, s, nil)
-		} else {
-			writeErr(w, r, errNotFound)
-		}
+		v, err := a.Service(r.Context(), r.PathValue("id"))
+		reply(w, r, v, err)
 	})
 	h("GET /v1/works", func(w http.ResponseWriter, r *http.Request) {
-		c := r.URL.Query().Get("category")
-		out := []Work{}
-		for _, wk := range works {
-			if c == "" || wk.Category == c {
-				out = append(out, wk)
-			}
-		}
-		reply(w, r, out, nil)
+		v, err := a.Works(r.Context(), r.URL.Query().Get("category"))
+		reply(w, r, v, err)
 	})
 	h("GET /v1/dates", func(w http.ResponseWriter, r *http.Request) { reply(w, r, a.datesFrom(1, bookableDays), nil) })
-	h("GET /v1/shop", func(w http.ResponseWriter, r *http.Request) { reply(w, r, shop, nil) })
+	h("GET /v1/shop", func(w http.ResponseWriter, r *http.Request) {
+		v, err := a.Shop(r.Context())
+		reply(w, r, v, err)
+	})
 
 	// ---------- 客人端预约 ----------
 	h("GET /v1/slots", func(w http.ResponseWriter, r *http.Request) {
@@ -213,6 +213,59 @@ func (a *App) Routes() http.Handler {
 	h("PUT /v1/owner/blocks", slot(a.BlockSlot))
 	h("DELETE /v1/owner/blocks", slot(a.UnblockSlot))
 
+	// ---------- 资料维护（店主端） ----------
+	h("PUT /v1/owner/shop", body(a.UpdateShop))
+	h("POST /v1/owner/artists", body(a.CreateArtist))
+	h("PUT /v1/owner/artists/{id}", bodyID(a.UpdateArtist))
+	h("DELETE /v1/owner/artists/{id}", del(a.DeleteArtist))
+	h("GET /v1/owner/services", list(a.OwnerServices))
+	h("POST /v1/owner/services", body(a.CreateService))
+	h("PUT /v1/owner/services/{id}", bodyID(a.UpdateService))
+	h("DELETE /v1/owner/services/{id}", del(a.DeleteService))
+	h("GET /v1/owner/works", list(a.OwnerWorks))
+	h("POST /v1/owner/works", body(a.CreateWork))
+	h("PUT /v1/owner/works/{id}", bodyID(a.UpdateWork))
+	h("DELETE /v1/owner/works/{id}", del(a.DeleteWork))
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { writeErr(w, r, errNotFound) })
 	return mux
+}
+
+// 资料维护接口的几种形状
+
+func list[T any](f func(context.Context, *User) (T, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		v, err := f(r.Context(), userOf(r))
+		reply(w, r, v, err)
+	}
+}
+
+func body[Req, T any](f func(context.Context, *User, Req) (T, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req Req
+		if err := decode(r, &req); err != nil {
+			writeErr(w, r, err)
+			return
+		}
+		v, err := f(r.Context(), userOf(r), req)
+		reply(w, r, v, err)
+	}
+}
+
+func bodyID[Req, T any](f func(context.Context, *User, string, Req) (T, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req Req
+		if err := decode(r, &req); err != nil {
+			writeErr(w, r, err)
+			return
+		}
+		v, err := f(r.Context(), userOf(r), r.PathValue("id"), req)
+		reply(w, r, v, err)
+	}
+}
+
+func del(f func(context.Context, *User, string) error) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		reply(w, r, struct{}{}, f(r.Context(), userOf(r), r.PathValue("id")))
+	}
 }

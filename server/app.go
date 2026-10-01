@@ -290,7 +290,11 @@ func (a *App) UpdateSkinProfile(ctx context.Context, u *User, req SkinProfile) (
 // ---------- 客人端预约 ----------
 
 func (a *App) ListSlots(ctx context.Context, u *User, artistID, date, excludeID string) ([]SlotView, error) {
-	if findArtist(artistID) == nil {
+	c, err := a.catalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if c.artist(artistID) == nil {
 		return nil, errNotFound
 	}
 	if !validDate(date) {
@@ -342,8 +346,8 @@ func (a *App) takenOn(ctx context.Context, date string) (map[string]*BookingRow,
 }
 
 // checkSlot 客人下单或改期时，这个时段能不能约
-func (a *App) checkSlot(ctx context.Context, artistID, date, t string) (*Artist, error) {
-	artist := findArtist(artistID)
+func (a *App) checkSlot(ctx context.Context, c *Catalog, artistID, date, t string) (*Artist, error) {
+	artist := c.artist(artistID)
 	if artist == nil {
 		return nil, errNotFound
 	}
@@ -375,9 +379,16 @@ func (a *App) payParams(b *BookingRow) WxPayParams {
 }
 
 func (a *App) CreateBooking(ctx context.Context, u *User, req CreateBookingReq) (CreateBookingResp, error) {
-	svc := findService(req.ServiceID)
+	c, err := a.catalog(ctx)
+	if err != nil {
+		return CreateBookingResp{}, err
+	}
+	svc := c.service(req.ServiceID)
 	if svc == nil {
 		return CreateBookingResp{}, errNotFound
+	}
+	if svc.Hidden {
+		return CreateBookingResp{}, apiErr("INVALID_STATE", "这个项目暂时不接预约了，看看别的吧")
 	}
 	if req.Occasion != "" && !occasions[req.Occasion] || req.SkinType != "" && !skinTypes[req.SkinType] {
 		return CreateBookingResp{}, badRequest("选项不对")
@@ -386,7 +397,7 @@ func (a *App) CreateBooking(ctx context.Context, u *User, req CreateBookingReq) 
 	if utf8.RuneCountInString(note) > maxTextLength {
 		return CreateBookingResp{}, badRequest("备注写得有点多了，控制在 200 字以内")
 	}
-	artist, err := a.checkSlot(ctx, req.ArtistID, req.Date, req.Time)
+	artist, err := a.checkSlot(ctx, c, req.ArtistID, req.Date, req.Time)
 	if err != nil {
 		return CreateBookingResp{}, err
 	}
@@ -535,7 +546,11 @@ func (a *App) RescheduleBooking(ctx context.Context, u *User, id string, req Slo
 	if err := a.changeable(b, "改期"); err != nil {
 		return Booking{}, err
 	}
-	artist, err := a.checkSlot(ctx, req.ArtistID, req.Date, req.Time)
+	c, err := a.catalog(ctx)
+	if err != nil {
+		return Booking{}, err
+	}
+	artist, err := a.checkSlot(ctx, c, req.ArtistID, req.Date, req.Time)
 	if err != nil {
 		return Booking{}, err
 	}
@@ -617,6 +632,11 @@ func (a *App) DaySchedule(ctx context.Context, u *User, date string) (DaySchedul
 	if err != nil {
 		return DaySchedule{}, err
 	}
+	c, err := a.catalog(ctx)
+	if err != nil {
+		return DaySchedule{}, err
+	}
+	artists := c.Artists
 
 	ds := DaySchedule{Date: date, Times: slotTimes, Cells: []ScheduleCell{}}
 	for _, ar := range artists {
@@ -699,11 +719,12 @@ func (a *App) ConfirmBooking(ctx context.Context, u *User, id string) (Booking, 
 	return a.out(b), nil
 }
 
-func (a *App) checkOwnerSlot(u *User, req SlotReq) error {
-	if err := a.requireOwner(u); err != nil {
+func (a *App) checkOwnerSlot(ctx context.Context, u *User, req SlotReq) error {
+	c, err := a.ownerCatalog(ctx, u)
+	if err != nil {
 		return err
 	}
-	if findArtist(req.ArtistID) == nil {
+	if c.artist(req.ArtistID) == nil {
 		return errNotFound
 	}
 	if !validDate(req.Date) || !isSlotTime(req.Time) {
@@ -716,7 +737,7 @@ func (a *App) checkOwnerSlot(u *User, req SlotReq) error {
 }
 
 func (a *App) BlockSlot(ctx context.Context, u *User, req SlotReq) error {
-	if err := a.checkOwnerSlot(u, req); err != nil {
+	if err := a.checkOwnerSlot(ctx, u, req); err != nil {
 		return err
 	}
 	taken, err := a.takenOn(ctx, req.Date)
@@ -730,7 +751,7 @@ func (a *App) BlockSlot(ctx context.Context, u *User, req SlotReq) error {
 }
 
 func (a *App) UnblockSlot(ctx context.Context, u *User, req SlotReq) error {
-	if err := a.checkOwnerSlot(u, req); err != nil {
+	if err := a.checkOwnerSlot(ctx, u, req); err != nil {
 		return err
 	}
 	return a.store.RemoveBlock(ctx, req.ArtistID, req.Date, req.Time)

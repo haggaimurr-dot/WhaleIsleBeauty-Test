@@ -120,7 +120,7 @@ func vals(kv ...string) map[string]map[string]string {
 }
 
 // confirmedMsg 当天才确认的预约不会再有到店提醒，备注里就不说“前一天会再提醒你”
-func (a *App) confirmedMsg(openid string, b *BookingRow) SubscribeMsg {
+func (a *App) confirmedMsg(openid string, b *BookingRow, shop Shop) SubscribeMsg {
 	note := "素颜过来就好，前一天会再提醒你"
 	if b.Date <= a.today() {
 		note = "素颜过来就好"
@@ -133,7 +133,7 @@ func (a *App) confirmedMsg(openid string, b *BookingRow) SubscribeMsg {
 	)}
 }
 
-func reminderMsg(openid string, b *BookingRow) SubscribeMsg {
+func reminderMsg(openid string, b *BookingRow, shop Shop) SubscribeMsg {
 	return SubscribeMsg{ToUser: openid, TemplateID: tmplReminder, Page: msgPage, Data: vals(
 		"thing1", thing(b.ServiceName),
 		"time3", msgTime(b),
@@ -151,7 +151,7 @@ func noticeKey(b *BookingRow, kind string) string {
 
 // notify 先在 notices 表里占位再发，多个实例同时跑也不会重复发。
 // 可以重试的错误把占位删掉，下一轮定时任务再发
-func (a *App) notify(ctx context.Context, b *BookingRow, kind string, msg func(string, *BookingRow) SubscribeMsg) {
+func (a *App) notify(ctx context.Context, b *BookingRow, kind string, msg func(string, *BookingRow, Shop) SubscribeMsg) {
 	if a.notifier == nil {
 		return
 	}
@@ -174,9 +174,15 @@ func (a *App) notify(ctx context.Context, b *BookingRow, kind string, msg func(s
 		_ = a.store.FinishNotice(ctx, key, "no_user")
 		return
 	}
+	shop, err := a.Shop(ctx)
+	if err != nil {
+		_ = a.store.ReleaseNotice(ctx, key)
+		log.Printf("notice %s: %v", key, err)
+		return
+	}
 	sendCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	err = a.notifier.Send(sendCtx, msg(u.OpenID, b))
+	err = a.notifier.Send(sendCtx, msg(u.OpenID, b, shop))
 	switch {
 	case err == nil:
 		_ = a.store.FinishNotice(ctx, key, "sent")

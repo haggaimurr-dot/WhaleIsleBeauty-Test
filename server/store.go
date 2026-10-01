@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -85,6 +86,15 @@ type Store interface {
 	FinishNotice(ctx context.Context, key, result string) error
 	// ReleaseNotice 删掉占位，下次可以重发
 	ReleaseNotice(ctx context.Context, key string) error
+
+	// CatalogItems 全部基础资料（catalog.go 负责排序和解析）
+	CatalogItems(ctx context.Context) ([]CatalogItem, error)
+	// PutCatalogItem 新增或整份替换；已有的保留原来的 Sort
+	PutCatalogItem(ctx context.Context, it CatalogItem) error
+	// DeleteCatalogItem 不存在返回 ErrNotFound
+	DeleteCatalogItem(ctx context.Context, kind, id string) error
+	// ActiveBookingExists 这位化妆师（或这个项目）还有没有进行中的预约。两个参数只传一个，另一个为空
+	ActiveBookingExists(ctx context.Context, artistID, serviceID string) (bool, error)
 }
 
 func isDue(b *BookingRow, now time.Time) bool {
@@ -105,12 +115,20 @@ type memStore struct {
 	mu       sync.Mutex
 	users    map[string]*User // by id
 	bookings map[string]*BookingRow
-	blocks   map[string]bool   // slotKey
-	notices  map[string]string // noticeKey → 结果，"" 表示正在发
+	blocks   map[string]bool        // slotKey
+	notices  map[string]string      // noticeKey → 结果，"" 表示正在发
+	catalog  map[string]CatalogItem // kind|id
 }
 
 func newMemStore() *memStore {
-	return &memStore{users: map[string]*User{}, bookings: map[string]*BookingRow{}, blocks: map[string]bool{}, notices: map[string]string{}}
+	s := &memStore{
+		users: map[string]*User{}, bookings: map[string]*BookingRow{}, blocks: map[string]bool{},
+		notices: map[string]string{}, catalog: map[string]CatalogItem{},
+	}
+	for _, it := range seedCatalogItems() {
+		s.catalog[it.Kind+"|"+it.ID] = it
+	}
+	return s
 }
 
 func cloneBooking(b *BookingRow) *BookingRow { c := *b; return &c }
@@ -255,11 +273,10 @@ func (s *memStore) BlocksOn(_ context.Context, date string) (map[string]bool, er
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := map[string]bool{}
-	for _, a := range artists {
-		for _, t := range slotTimes {
-			if s.blocks[slotKey(a.ID, date, t)] {
-				out[a.ID+"|"+t] = true
-			}
+	for k := range s.blocks {
+		// slotKey 是 artistID|date|time
+		if parts := strings.Split(k, "|"); len(parts) == 3 && parts[1] == date {
+			out[parts[0]+"|"+parts[2]] = true
 		}
 	}
 	return out, nil
@@ -301,4 +318,47 @@ func (s *memStore) ReleaseNotice(_ context.Context, key string) error {
 	defer s.mu.Unlock()
 	delete(s.notices, key)
 	return nil
+}
+
+func (s *memStore) CatalogItems(_ context.Context) ([]CatalogItem, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]CatalogItem, 0, len(s.catalog))
+	for _, it := range s.catalog {
+		out = append(out, it)
+	}
+	return out, nil
+}
+
+func (s *memStore) PutCatalogItem(_ context.Context, it CatalogItem) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := it.Kind + "|" + it.ID
+	if old, ok := s.catalog[key]; ok {
+		it.Sort = old.Sort
+	}
+	s.catalog[key] = it
+	return nil
+}
+
+func (s *memStore) DeleteCatalogItem(_ context.Context, kind, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := kind + "|" + id
+	if _, ok := s.catalog[key]; !ok {
+		return ErrNotFound
+	}
+	delete(s.catalog, key)
+	return nil
+}
+
+func (s *memStore) ActiveBookingExists(_ context.Context, artistID, serviceID string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, b := range s.bookings {
+		if isActive(b.Status) && (artistID != "" && b.ArtistID == artistID || serviceID != "" && b.ServiceID == serviceID) {
+			return true, nil
+		}
+	}
+	return false, nil
 }

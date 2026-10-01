@@ -52,6 +52,11 @@ export interface Service {
   images: string[]
   /** 已选择人数，用于详情页展示 */
   bookedCount: number
+  /**
+   * 已下架：客人看不到、不能新约，已经约了的照常进行。
+   * 只有店主接口和 getService 会返回下架的项目（详情页据此显示“暂时不接预约”）
+   */
+  hidden?: boolean
 }
 
 export interface Work {
@@ -77,6 +82,17 @@ export interface Shop {
   latitude: number
   longitude: number
 }
+
+// ---------- 资料维护（店主端） ----------
+
+/** 新建、修改化妆师时提交的内容，整份替换 */
+export type ArtistInput = Omit<Artist, 'id'>
+
+/** 新建、修改项目时提交的内容，整份替换。bookedCount 由服务端维护，新项目从 0 开始 */
+export type ServiceInput = Omit<Service, 'id' | 'bookedCount'>
+
+/** 新建、修改作品时提交的内容，整份替换 */
+export type WorkInput = Omit<Work, 'id'>
 
 // ---------- 用户 ----------
 
