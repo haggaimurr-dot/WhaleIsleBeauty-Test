@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -196,12 +197,38 @@ func (a *App) UserFor(ctx context.Context, openid string) (*User, error) {
 	if err != nil || u != nil {
 		return u, err
 	}
-	id := newID("u")
-	// 微信已不再给昵称，先用 id 尾号区分客人，以后可以让客人自己改
+	// 微信已不再给昵称和头像，注册时随机给一个；之后登录沿用，不再变
 	return a.store.CreateUser(ctx, &User{
-		ID: id, OpenID: openid, Nickname: "客人" + id[len(id)-4:], Avatar: "placeholder:g4", CreatedAt: a.now().UTC(),
+		ID: newID("u"), OpenID: openid, Nickname: randomNickname(), Avatar: randomAvatar(), CreatedAt: a.now().UTC(),
 	})
 }
+
+// nicknameWords 新客人昵称用的词：两个字、语气温和，和小程序的文案一个调子。
+// 后面接两位数字（如“柚子27”），店主在排班里能区分同一个词的不同客人；四个字也放得下排班格子
+var nicknameWords = []string{
+	"柚子", "栗子", "桃子", "橘子", "雪梨", "杏仁", "可可", "奶茶",
+	"麻薯", "芋圆", "团子", "布丁", "抹茶", "糯米", "海盐", "蜜桃",
+	"晚风", "月亮", "星星", "云朵", "小鹿", "铃兰", "茉莉", "山茶",
+}
+
+// avatarChoices 头像先用原型里的 g1–g6 渐变占位，ArchImage 会画成拱形
+var avatarChoices = []string{
+	"placeholder:g1", "placeholder:g2", "placeholder:g3",
+	"placeholder:g4", "placeholder:g5", "placeholder:g6",
+}
+
+// randIndex [0, n) 的随机数。只用于昵称头像，不要求均匀到密码学级别
+func randIndex(n int) int {
+	var b [4]byte
+	_, _ = rand.Read(b[:])
+	return int(binary.BigEndian.Uint32(b[:]) % uint32(n))
+}
+
+func randomNickname() string {
+	return fmt.Sprintf("%s%02d", nicknameWords[randIndex(len(nicknameWords))], randIndex(100))
+}
+
+func randomAvatar() string { return avatarChoices[randIndex(len(avatarChoices))] }
 
 var skinSummaryLabel = map[string]string{"dry": "干皮", "oily": "油皮", "combination": "混合皮", "sensitive": "敏感肌"}
 var toneLabel = map[string]string{"cool_fair": "冷白皮", "warm_fair": "暖白皮", "natural": "自然色", "wheat": "小麦色"}
