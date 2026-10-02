@@ -20,7 +20,9 @@
 				{ "path": "catalog/artists", "style": { "disableScroll": true, "navigationBarTitleText": "化妆师" } },
 				{ "path": "catalog/artist", "style": { "disableScroll": true, "navigationBarTitleText": "化妆师" } },
 				{ "path": "catalog/services", "style": { "disableScroll": true, "navigationBarTitleText": "项目" } },
-				{ "path": "catalog/service", "style": { "disableScroll": true, "navigationBarTitleText": "项目" } }
+				{ "path": "catalog/service", "style": { "disableScroll": true, "navigationBarTitleText": "项目" } },
+				{ "path": "catalog/works", "style": { "disableScroll": true, "navigationBarTitleText": "作品" } },
+				{ "path": "catalog/work", "style": { "disableScroll": true, "navigationBarTitleText": "作品" } }
 			]
 		}
 	],

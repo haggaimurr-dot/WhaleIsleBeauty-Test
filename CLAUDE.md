@@ -106,6 +106,8 @@ src/
 | pages-owner/catalog/artist | 添加 / 修改化妆师（query 带 `id` 时是修改） | 无 |
 | pages-owner/catalog/services | 项目列表（含已下架） | 无 |
 | pages-owner/catalog/service | 添加 / 修改项目，可下架（query 带 `id` 时是修改） | 无 |
+| pages-owner/catalog/works | 作品列表 | 无 |
+| pages-owner/catalog/work | 添加 / 修改作品（query 带 `id` 时是修改） | 无 |
 
 TabBar 包含首页、作品、预约、我的，使用 `pages.json` 的原生 tabBar。图标需要 PNG 格式（81×81），放在 `static/tab/`。
 
