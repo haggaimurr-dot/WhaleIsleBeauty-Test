@@ -169,6 +169,8 @@ export const httpApi: Api = {
   confirmBooking: (id) => request('POST', `/owner/bookings/${id}/confirm`),
   blockSlot: (artistId, date, time) => request('PUT', '/owner/blocks', { artistId, date, time }),
   unblockSlot: (artistId, date, time) => request('DELETE', '/owner/blocks', { artistId, date, time }),
+  getOwnerNotify: () => request('GET', '/owner/notify'),
+  addOwnerNotify: (count) => request('POST', '/owner/notify', { count }),
 
   updateShop: (shop) => request('PUT', '/owner/shop', shop),
   createArtist: (req) => request('POST', '/owner/artists', req),

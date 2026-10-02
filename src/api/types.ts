@@ -253,6 +253,17 @@ export interface RescheduleReq {
  */
 export type SlotState = 'free' | 'booked' | 'pending' | 'blocked' | 'past'
 
+/**
+ * 店主的预约变动提醒（订阅消息）。微信只给一次性订阅：店主每同意一次，后端才能发一条。
+ * quota 是还能发几条，后端每发一条减一；微信说没订阅（43101）时清零。
+ */
+export interface OwnerNotifyStatus {
+  quota: number
+}
+
+/** 发给店主的提醒种类：付完定金的新预约、客人改期、客人取消（都只针对付过定金的预约） */
+export type OwnerNoticeKind = 'new' | 'rescheduled' | 'cancelled'
+
 export interface OwnerBookingBrief {
   id: ID
   customerName: string

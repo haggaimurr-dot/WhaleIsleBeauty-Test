@@ -5,7 +5,7 @@
 import type { Api } from './contract'
 import {
   ApiError, type Artist, type Booking, type BookingStatus, type CreateBookingReq,
-  type DateStr, type DaySchedule, type ID, type Me, type OwnerBookingBrief,
+  type DateStr, type DaySchedule, type ID, type Me, type OwnerBookingBrief, type OwnerNoticeKind,
   type ScheduleCell, type Service, type Shop, type SkinProfile, type SkinType, type SlotView,
   type TimeStr, type UpdateSkinProfileReq, type Work, type WorkInput, type Occasion, TONE_LABEL,
 } from './types'
@@ -217,6 +217,22 @@ function requireOwner() {
   if (me.role !== 'owner') throw new ApiError('FORBIDDEN', '只有店主可以进行这个操作')
 }
 
+// ---------- 通知店主 ----------
+
+/** 店主还能收到几条提醒。mock 只有一位店主 */
+let ownerQuota = 0
+const ownerNoticeLog: { kind: OwnerNoticeKind, bookingId: ID }[] = []
+
+/** 和后端一样：有额度才“发”，发一条减一 */
+function notifyOwner(kind: OwnerNoticeKind, b: Booking) {
+  if (ownerQuota <= 0) return
+  ownerQuota--
+  ownerNoticeLog.push({ kind, bookingId: b.id })
+}
+
+/** mock 专用：已经“发”给店主的提醒，测试用 */
+export const __ownerNotices = () => ownerNoticeLog.map(n => ({ ...n }))
+
 // ---------- 资料维护 ----------
 
 function indexOrThrow<T extends { id: ID }>(list: T[], id: ID): number {
@@ -253,6 +269,7 @@ export async function __simulatePaid(id: ID) {
   if (b.status === 'pending_payment') {
     b.status = 'pending_confirm'
     delete b.payDeadline
+    notifyOwner('new', b)
   }
 }
 
@@ -348,9 +365,11 @@ export const mockApi: Api = {
     const b = getBookingOrThrow(id)
     if (!ACTIVE.includes(b.status)) throw new ApiError('INVALID_STATE', '这个预约的状态已经变了')
     if (!out(b).canCancel) throw new ApiError('CANCEL_TOO_LATE', '距离开始不到 24 小时，需要取消请直接联系门店')
+    const paid = b.status !== 'pending_payment'
     b.status = 'cancelled'
     b.cancelReason = 'customer'
     delete b.payDeadline
+    if (paid) notifyOwner('cancelled', b)
     return out(b)
   },
 
@@ -368,6 +387,7 @@ export const mockApi: Api = {
       // 付过定金的要店里重新确认；还没付的仍是待付定金，不能借改期绕过付款
       status: b.status === 'pending_payment' ? 'pending_payment' : 'pending_confirm',
     })
+    if (b.status !== 'pending_payment') notifyOwner('rescheduled', b)
     return out(b)
   },
 
@@ -453,6 +473,20 @@ export const mockApi: Api = {
     requireOwner()
     if (isPast(date, time)) throw new ApiError('INVALID_STATE', '这个时段已经过去了')
     blocks.delete(slotKey(artistId, date, time))
+  },
+
+  async getOwnerNotify() {
+    await delay(100)
+    requireOwner()
+    return { quota: ownerQuota }
+  },
+
+  async addOwnerNotify(count) {
+    await delay(150)
+    requireOwner()
+    if (!Number.isInteger(count) || count < 1 || count > 5) throw new ApiError('UNKNOWN', '额度一次只能加 1–5 条')
+    ownerQuota += count
+    return { quota: ownerQuota }
   },
 
   async updateShop(req) {

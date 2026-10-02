@@ -28,7 +28,7 @@ export async function freshMock() {
     get: (t, k: keyof typeof m.mockApi) => (...args: unknown[]) => settle((t[k] as (...a: unknown[]) => Promise<unknown>)(...args)),
   }) as typeof m.mockApi
   const simulatePaid = (id: string) => settle(m.__simulatePaid(id))
-  return { api, simulatePaid }
+  return { api, simulatePaid, ownerNotices: m.__ownerNotices }
 }
 
 /** 本地日期 → 'YYYY-MM-DD' */

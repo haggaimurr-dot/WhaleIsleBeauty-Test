@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"log"
 	"net/http"
 	"time"
@@ -212,4 +213,94 @@ func (a *App) SendReminders(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// ---------- 通知店主 ----------
+//
+// 客人付完定金、改期、取消（只算付过定金的）时，给每位店主发一条“预约变动提醒”。
+// 也是一次性订阅：店主在排班页每同意一次，额度加一（AddOwnerNotify），每发一条减一。
+// 不经过 notices 表：这几个时机本身只会发生一次（支付回调重复到达时 MarkPaid 不会再走到这里）。
+
+// tmplOwner 小程序后台还没选模板，先留空，留空时不发也不扣额度。选好后和 src/utils/subscribe.ts 的 owner 一起填。
+// 下面的字段 key 也要按「我的模板」详情改
+var tmplOwner = ""
+
+const (
+	ownerKeyService  = "thing1"  // 预约项目
+	ownerKeyTime     = "time2"   // 预约时间
+	ownerKeyCustomer = "thing3"  // 客人 · 化妆师
+	ownerKeyStatus   = "phrase4" // 状态：新预约 / 已改期 / 已取消
+	ownerKeyNote     = "thing5"  // 备注
+
+	ownerMsgPage = "pages-owner/schedule/index"
+)
+
+type ownerNotice struct {
+	status, note string
+}
+
+var (
+	ownerNew         = ownerNotice{"新预约", "定金已付，等你确认"}
+	ownerRescheduled = ownerNotice{"已改期", "改到这个时间，等你重新确认"}
+	ownerCancelled   = ownerNotice{"已取消", "定金已退，这个时段空出来了"}
+)
+
+func ownerMsg(openid string, b *BookingRow, customer *User, k ownerNotice) SubscribeMsg {
+	return SubscribeMsg{ToUser: openid, TemplateID: tmplOwner, Page: ownerMsgPage + "?date=" + b.Date, Data: vals(
+		ownerKeyService, thing(b.ServiceName),
+		ownerKeyTime, msgTime(b),
+		ownerKeyCustomer, thing(customer.Nickname+" · "+b.ArtistName),
+		ownerKeyStatus, k.status,
+		ownerKeyNote, k.note,
+	)}
+}
+
+// notifyOwners 有额度才发；没发出去把额度退回，微信说没订阅（43101 等）就清零，让店主重新续
+func (a *App) notifyOwners(ctx context.Context, b *BookingRow, customer *User, k ownerNotice) {
+	if a.notifier == nil || tmplOwner == "" {
+		return
+	}
+	for openid := range a.owners {
+		ok, err := a.store.TakeOwnerNotifyQuota(ctx, openid)
+		if err != nil || !ok {
+			if err != nil {
+				log.Printf("owner notice %s %s: %v", b.ID, k.status, err)
+			}
+			continue
+		}
+		sendCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		err = a.notifier.Send(sendCtx, ownerMsg(openid, b, customer, k))
+		cancel()
+		if err == nil {
+			continue
+		}
+		log.Printf("owner notice %s %s: %v", b.ID, k.status, err)
+		var we *WxError
+		if errors.As(err, &we) && we.Code == 43101 {
+			_, _ = a.store.AddOwnerNotifyQuota(ctx, openid, -math.MaxInt32) // 清零
+		} else {
+			_, _ = a.store.AddOwnerNotifyQuota(ctx, openid, 1)
+		}
+	}
+}
+
+// OwnerNotify GET /owner/notify
+func (a *App) OwnerNotify(ctx context.Context, u *User) (OwnerNotifyStatus, error) {
+	if err := a.requireOwner(u); err != nil {
+		return OwnerNotifyStatus{}, err
+	}
+	n, err := a.store.OwnerNotifyQuota(ctx, u.OpenID)
+	return OwnerNotifyStatus{Quota: n}, err
+}
+
+// AddOwnerNotify POST /owner/notify  店主在小程序里同意了 count 次订阅
+func (a *App) AddOwnerNotify(ctx context.Context, u *User, req OwnerNotifyReq) (OwnerNotifyStatus, error) {
+	if err := a.requireOwner(u); err != nil {
+		return OwnerNotifyStatus{}, err
+	}
+	if req.Count < 1 || req.Count > 5 {
+		return OwnerNotifyStatus{}, apiErr("UNKNOWN", "额度一次只能加 1–5 条")
+	}
+	n, err := a.store.AddOwnerNotifyQuota(ctx, u.OpenID, req.Count)
+	return OwnerNotifyStatus{Quota: n}, err
 }

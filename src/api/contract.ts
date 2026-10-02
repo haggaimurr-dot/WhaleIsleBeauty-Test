@@ -1,6 +1,6 @@
 import type {
   Artist, ArtistInput, Booking, CreateBookingReq, CreateBookingResp, DateStr, DaySchedule,
-  ID, Me, RescheduleReq, Service, ServiceInput, Shop, SkinProfile, SlotView, StyleCategory, TimeStr,
+  ID, Me, OwnerNotifyStatus, RescheduleReq, Service, ServiceInput, Shop, SkinProfile, SlotView, StyleCategory, TimeStr,
   UpdateSkinProfileReq, Work, WorkInput,
 } from './types'
 
@@ -104,6 +104,19 @@ export interface Api {
   blockSlot(artistId: ID, date: DateStr, time: TimeStr): Promise<void>
   /** DELETE /owner/blocks  body: { artistId, date, time }  时段已过去返回 INVALID_STATE */
   unblockSlot(artistId: ID, date: DateStr, time: TimeStr): Promise<void>
+
+  // ---------- 通知店主（店主端，需要 owner 角色） ----------
+  // 客人付完定金、改期、取消（只算付过定金的）时，后端给每位店主发一条订阅消息“预约变动提醒”，
+  // 模板和字段见 utils/subscribe.ts 的 owner。一次性订阅，每发一条用掉该店主一次额度，额度为 0 就不发。
+  // 发不出去不影响客人的操作。
+
+  /** GET /owner/notify  还能收到几条提醒 */
+  getOwnerNotify(): Promise<OwnerNotifyStatus>
+  /**
+   * POST /owner/notify  body: { count }  店主在小程序里同意了 count 次订阅，加到额度上，返回新的额度。
+   * count 必须是 1–5 的整数，否则返回 400 UNKNOWN
+   */
+  addOwnerNotify(count: number): Promise<OwnerNotifyStatus>
 
   // ---------- 资料维护（店主端，需要 owner 角色） ----------
   // 提交的内容整份替换，字段限制见 catalog.ts 的 validateXxx，前后端用同一套规则；不符合返回 400 UNKNOWN，message 说明哪里不对。

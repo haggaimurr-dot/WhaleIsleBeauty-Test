@@ -87,6 +87,13 @@ type Store interface {
 	// ReleaseNotice 删掉占位，下次可以重发
 	ReleaseNotice(ctx context.Context, key string) error
 
+	// OwnerNotifyQuota 店主还能收几条提醒，没记录过是 0
+	OwnerNotifyQuota(ctx context.Context, openid string) (int, error)
+	// AddOwnerNotifyQuota 加 n 条（n 可以是负数，结果不会小于 0），返回加完的额度
+	AddOwnerNotifyQuota(ctx context.Context, openid string, n int) (int, error)
+	// TakeOwnerNotifyQuota 额度大于 0 时减一并返回 true；多个实例同时扣也不会扣成负数
+	TakeOwnerNotifyQuota(ctx context.Context, openid string) (bool, error)
+
 	// CatalogItems 全部基础资料（catalog.go 负责排序和解析）
 	CatalogItems(ctx context.Context) ([]CatalogItem, error)
 	// PutCatalogItem 新增或整份替换；已有的保留原来的 Sort
@@ -117,13 +124,14 @@ type memStore struct {
 	bookings map[string]*BookingRow
 	blocks   map[string]bool        // slotKey
 	notices  map[string]string      // noticeKey → 结果，"" 表示正在发
+	quota    map[string]int         // 店主 openid → 提醒额度
 	catalog  map[string]CatalogItem // kind|id
 }
 
 func newMemStore() *memStore {
 	s := &memStore{
 		users: map[string]*User{}, bookings: map[string]*BookingRow{}, blocks: map[string]bool{},
-		notices: map[string]string{}, catalog: map[string]CatalogItem{},
+		notices: map[string]string{}, catalog: map[string]CatalogItem{}, quota: map[string]int{},
 	}
 	for _, it := range seedCatalogItems() {
 		s.catalog[it.Kind+"|"+it.ID] = it
@@ -318,6 +326,29 @@ func (s *memStore) ReleaseNotice(_ context.Context, key string) error {
 	defer s.mu.Unlock()
 	delete(s.notices, key)
 	return nil
+}
+
+func (s *memStore) OwnerNotifyQuota(_ context.Context, openid string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.quota[openid], nil
+}
+
+func (s *memStore) AddOwnerNotifyQuota(_ context.Context, openid string, n int) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.quota[openid] = max(s.quota[openid]+n, 0)
+	return s.quota[openid], nil
+}
+
+func (s *memStore) TakeOwnerNotifyQuota(_ context.Context, openid string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.quota[openid] <= 0 {
+		return false, nil
+	}
+	s.quota[openid]--
+	return true, nil
 }
 
 func (s *memStore) CatalogItems(_ context.Context) ([]CatalogItem, error) {

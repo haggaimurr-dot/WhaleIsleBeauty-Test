@@ -214,6 +214,9 @@ func (a *App) Routes() http.Handler {
 	h("DELETE /v1/owner/blocks", slot(a.UnblockSlot))
 
 	// ---------- 资料维护（店主端） ----------
+	h("GET /v1/owner/notify", list(a.OwnerNotify))
+	h("POST /v1/owner/notify", body(a.AddOwnerNotify))
+
 	h("PUT /v1/owner/shop", body(a.UpdateShop))
 	h("POST /v1/owner/artists", body(a.CreateArtist))
 	h("PUT /v1/owner/artists/{id}", bodyID(a.UpdateArtist))

@@ -115,6 +115,15 @@ type CreateBookingResp struct {
 	Payment WxPayParams `json:"payment"`
 }
 
+// OwnerNotifyStatus 店主还能收几条预约变动提醒
+type OwnerNotifyStatus struct {
+	Quota int `json:"quota"`
+}
+
+type OwnerNotifyReq struct {
+	Count int `json:"count"`
+}
+
 type SlotReq struct {
 	ArtistID string `json:"artistId"`
 	Date     string `json:"date"`

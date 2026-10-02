@@ -504,6 +504,7 @@ func (a *App) MarkPaid(ctx context.Context, u *User, id string) (Booking, error)
 		}
 		return Booking{}, err
 	}
+	a.notifyOwners(ctx, b, u, ownerNew)
 	return a.out(b), nil
 }
 
@@ -534,6 +535,10 @@ func (a *App) CancelBooking(ctx context.Context, u *User, id string) (Booking, e
 			return Booking{}, errStateMoved
 		}
 		return Booking{}, err
+	}
+	// 还没付定金的店主不知道，取消了也不打扰
+	if from != StatusPendingPayment {
+		a.notifyOwners(ctx, b, u, ownerCancelled)
 	}
 	return a.out(b), nil
 }
@@ -570,6 +575,9 @@ func (a *App) RescheduleBooking(ctx context.Context, u *User, id string, req Slo
 			return Booking{}, errStateMoved
 		}
 		return Booking{}, err
+	}
+	if from != StatusPendingPayment {
+		a.notifyOwners(ctx, b, u, ownerRescheduled)
 	}
 	return a.out(b), nil
 }

@@ -28,6 +28,15 @@
       </view>
 
       <template v-else>
+        <!-- 预约变动提醒：微信只给一次性订阅，点一次攒一条；确认预约时也会顺手续一条 -->
+        <view v-if="quota !== undefined" class="notify" :class="{ 'notify--empty': quota === 0 }">
+          <view class="notify__text">
+            <view class="notify__title">{{ quota ? `新预约提醒还能收 ${quota} 条` : '新预约提醒用完了' }}</view>
+            {{ quota ? '客人付定金、改期、取消都会发到微信' : '续上之前，有新预约微信不会通知你' }}
+          </view>
+          <AppButton variant="ghost" size="sm" @click="addQuota">{{ quota ? '多收一条' : '续上提醒' }}</AppButton>
+        </view>
+
         <!-- 循环变量别用单字母：uni-app 编译后的数据键也是单字母，会撞上（之前 p 撞了 dateText，提醒条渲染不出来） -->
         <view v-for="pend in pendings" :key="pend.booking.id" class="pending">
           <view class="pending__text">
@@ -128,7 +137,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import {
   api, errorText, ApiError,
   type DateStr, type DaySchedule, type ID, type OwnerBookingBrief, type ScheduleCell, type TimeStr,
@@ -140,6 +149,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import DayPicker from '@/components/DayPicker.vue'
 import PageLayout from '@/components/PageLayout.vue'
+import { OWNER_SUBSCRIBE_READY, requestOwnerSubscribe } from '@/utils/subscribe'
 
 const layout = ref<InstanceType<typeof PageLayout>>()
 const dates = ref<DateStr[]>([])
@@ -196,8 +206,9 @@ async function load() {
   try {
     if (!dates.value.length) {
       dates.value = await api.listScheduleDates()
-      date.value = dates.value[0]
+      date.value = dates.value.includes(wantDate as DateStr) ? wantDate : dates.value[0]
     }
+    loadQuota()
     if (!date.value) return
     const s = await api.getDaySchedule(date.value)
     if (mine !== seq) return
@@ -211,8 +222,45 @@ async function load() {
   }
 }
 
+// 从提醒消息点进来时带 ?date=，直接看那一天
+let wantDate: DateStr | undefined
+onLoad(q => { wantDate = q?.date })
+
 // 从“我的”回来或客人刚下了单，都重新拉一次
 onShow(load)
+
+// ---------- 预约变动提醒 ----------
+
+/** 还能收几条提醒；模板没配或者没拉到时为 undefined，不显示 */
+const quota = ref<number>()
+
+async function loadQuota() {
+  if (!OWNER_SUBSCRIBE_READY) return
+  try {
+    quota.value = (await api.getOwnerNotify()).quota
+  } catch {
+    // 额度拉不到不影响排班，下次进来再拉
+  }
+}
+
+/** 必须在点击里同步发起订阅，前面不能有 await */
+function subscribeOnce() {
+  if (!OWNER_SUBSCRIBE_READY) return Promise.resolve(false)
+  return requestOwnerSubscribe().then(async ok => {
+    if (!ok) return false
+    try {
+      quota.value = (await api.addOwnerNotify(1)).quota
+      return true
+    } catch {
+      return false
+    }
+  })
+}
+
+async function addQuota() {
+  const ok = await subscribeOnce()
+  toast(ok ? '好了，又能多收一条' : '没有同意，这次没加上')
+}
 
 function changeDate(d: DateStr) {
   date.value = d
@@ -241,6 +289,7 @@ async function run(key: string, action: () => Promise<unknown>, done: string) {
 }
 
 function confirm(b: OwnerBookingBrief) {
+  if (!busyKey.value) subscribeOnce() // 顺手续一条，不等结果，同不同意都不影响确认
   return run(b.id, async () => {
     await api.confirmBooking(b.id)
     confirmedHere.value.add(b.id)
@@ -383,6 +432,35 @@ async function confirmInSheet() {
     font-size: $fs-body;
     font-weight: 600;
     color: $ink;
+  }
+}
+
+.notify {
+  display: flex;
+  align-items: center;
+  gap: $gap;
+  margin: 8rpx $page-x 20rpx;
+  padding: 24rpx 28rpx;
+  border: 1rpx solid $hair;
+  border-radius: $r-card;
+  background: $card;
+
+  &__text {
+    flex: 1;
+    min-width: 0;
+    font-size: $fs-caption;
+    line-height: 1.6;
+    color: $mute;
+  }
+
+  &__title {
+    font-size: $fs-small;
+    font-weight: 600;
+    color: $ink;
+  }
+
+  &--empty &__title {
+    color: $mocha;
   }
 }
 

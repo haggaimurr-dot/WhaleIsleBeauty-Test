@@ -5,10 +5,11 @@ import { freshMock, useMockClock } from '@/test/helpers'
 
 let api: Awaited<ReturnType<typeof freshMock>>['api']
 let simulatePaid: Awaited<ReturnType<typeof freshMock>>['simulatePaid']
+let ownerNotices: Awaited<ReturnType<typeof freshMock>>['ownerNotices']
 
 beforeEach(async () => {
   useMockClock() // 2026-09-30 10:00
-  ;({ api, simulatePaid } = await freshMock())
+  ;({ api, simulatePaid, ownerNotices } = await freshMock())
 })
 afterEach(() => { vi.useRealTimers() })
 
@@ -123,4 +124,55 @@ describe('肤质档案', () => {
     expect(brief.note).toBeUndefined()
     expect(brief.profile).toBeUndefined()
   })
+})
+
+describe('通知店主', () => {
+  /** 约明天 a1 的一个空闲时段；pay 为 true 时顺便付定金 */
+  async function book(pay = true) {
+    const date = '2026-10-02'
+    const time = await freeCell(date)
+    const { booking } = await api.createBooking({ serviceId: 's1', artistId: 'a1', date, time })
+    if (pay) await simulatePaid(booking.id)
+    return booking
+  }
+
+  it('额度从 0 开始，每次同意加上，一次最多加 5，不能是 0 或负数', async () => {
+    expect((await api.getOwnerNotify()).quota).toBe(0)
+    expect((await api.addOwnerNotify(1)).quota).toBe(1)
+    expect((await api.addOwnerNotify(5)).quota).toBe(6)
+    for (const n of [0, -1, 6, 1.5]) {
+      await expect(api.addOwnerNotify(n)).rejects.toSatisfy(e => code(e) === 'UNKNOWN')
+    }
+    expect((await api.getOwnerNotify()).quota).toBe(6)
+  })
+
+  it('付完定金、改期、取消各发一条，每条用掉一次额度', async () => {
+    await api.addOwnerNotify(5)
+    const b = await book()
+    expect(ownerNotices()).toEqual([{ kind: 'new', bookingId: b.id }])
+    const time = await freeCell('2026-10-03')
+    await api.rescheduleBooking(b.id, { artistId: 'a1', date: '2026-10-03', time })
+    await api.cancelBooking(b.id)
+    expect(ownerNotices().map(n => n.kind)).toEqual(['new', 'rescheduled', 'cancelled'])
+    expect((await api.getOwnerNotify()).quota).toBe(2)
+  })
+
+  it('还没付定金的预约改期、取消、超时都不打扰店主', async () => {
+    await api.addOwnerNotify(5)
+    const b = await book(false)
+    const time = await freeCell('2026-10-03')
+    await api.rescheduleBooking(b.id, { artistId: 'a1', date: '2026-10-03', time })
+    await api.cancelBooking(b.id)
+    expect(ownerNotices()).toEqual([])
+    expect((await api.getOwnerNotify()).quota).toBe(5)
+  })
+
+  it('额度用完就不发，也不会变成负数', async () => {
+    await api.addOwnerNotify(1)
+    await book()
+    await book()
+    expect(ownerNotices()).toHaveLength(1)
+    expect((await api.getOwnerNotify()).quota).toBe(0)
+  })
+
 })

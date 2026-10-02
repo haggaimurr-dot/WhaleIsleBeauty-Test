@@ -343,6 +343,38 @@ func (s *mysqlStore) ReleaseNotice(ctx context.Context, key string) error {
 	return err
 }
 
+// ---------- 店主提醒额度 ----------
+
+func (s *mysqlStore) OwnerNotifyQuota(ctx context.Context, openid string) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT quota FROM owner_notify WHERE openid = ?`, openid).Scan(&n)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return n, err
+}
+
+func (s *mysqlStore) AddOwnerNotifyQuota(ctx context.Context, openid string, n int) (int, error) {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO owner_notify (openid, quota, updated_at) VALUES (?, GREATEST(?, 0), ?)
+		 ON DUPLICATE KEY UPDATE quota = GREATEST(quota + ?, 0), updated_at = VALUES(updated_at)`,
+		openid, n, time.Now().UTC(), n)
+	if err != nil {
+		return 0, err
+	}
+	return s.OwnerNotifyQuota(ctx, openid)
+}
+
+func (s *mysqlStore) TakeOwnerNotifyQuota(ctx context.Context, openid string) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE owner_notify SET quota = quota - 1, updated_at = ? WHERE openid = ? AND quota > 0`, time.Now().UTC(), openid)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
+}
+
 // ---------- 基础资料 ----------
 
 // seedCatalog 表是空的时候写入初始数据。多个实例同时启动也没关系：主键冲突的被 IGNORE 掉
