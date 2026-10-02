@@ -6,10 +6,10 @@
     </view>
 
     <template v-else-if="status === 'ok'">
-      <!-- 和“作品”页瀑布流里的一格一样大，形状、标题一眼能看到 -->
+      <!-- 和“作品”页瀑布流里的一格一样大，高度、标题一眼能看到 -->
       <view class="preview">
         <view class="preview__cell">
-          <ArchImage :src="form.image || 'placeholder:none'" :ratio="form.ratio" :label="form.image ? '' : '还没选图'" />
+          <ArchImage :src="form.image || 'placeholder:none'" :style="{ height: `${workImageHeight(form.ratio)}rpx` }" :label="form.image ? '' : '还没选图'" />
           <view class="preview__title">{{ form.title.trim() || '标题' }}</view>
           <view class="preview__artist">化妆师 {{ artistName || '…' }}</view>
         </view>
@@ -30,9 +30,9 @@
       </view>
       <view class="hint">演示版先从这几个里选，以后可以上传照片。</view>
 
-      <view class="h">形状<text class="h__opt">高一点的图在瀑布流里更显眼</text></view>
+      <view class="h">高度<text class="h__opt">高一点的图在瀑布流里更显眼</text></view>
       <view class="chips">
-        <Chip v-for="o in ratioOptions" :key="o.label" :label="o.label" :selected="form.ratio === o.ratio" @click="form.ratio = o.ratio" />
+        <Chip v-for="o in RATIOS" :key="o.label" :label="o.label" :selected="workImageHeight(form.ratio) === workImageHeight(o.ratio)" @click="form.ratio = o.ratio" />
       </view>
 
       <view class="h">标题</view>
@@ -100,15 +100,16 @@ import ArchImage from '@/components/ArchImage.vue'
 import BottomBar from '@/components/BottomBar.vue'
 import Chip from '@/components/Chip.vue'
 import PageLayout from '@/components/PageLayout.vue'
+import { workImageHeight } from '@/utils/work'
 
 const PICS = ['g1', 'g2', 'g3', 'g4', 'g5', 'g6'].map(g => `placeholder:${g}`)
 const CATEGORIES = Object.keys(CATEGORY_LABEL) as StyleCategory[]
-/** 以后上传照片时按照片宽高算，演示版先给几个常见形状 */
+/** 瀑布流里只有这几档高度（utils/work.ts），以后上传照片时按照片宽高落到最近一档 */
 const RATIOS = [
-  { label: '方图 1:1', ratio: 1 },
-  { label: '4:5', ratio: 1.25 },
-  { label: '3:4', ratio: 1.33 },
-  { label: '2:3', ratio: 1.5 },
+  { label: '矮', ratio: 1 },
+  { label: '适中', ratio: 1.25 },
+  { label: '较高', ratio: 1.33 },
+  { label: '最高', ratio: 1.5 },
 ]
 
 const id = ref<ID>('')
@@ -144,10 +145,6 @@ const dirty = computed(() => JSON.stringify(toInput(form)) !== JSON.stringify(to
 
 const artistName = computed(() => artists.value.find(a => a.id === form.artistId)?.name ?? '')
 
-/** 原来的比例不在常用形状里时（比如以前的作品），多给一个“保持原样” */
-const ratioOptions = computed(() => RATIOS.some(o => o.ratio === saved.value.ratio)
-  ? RATIOS
-  : [...RATIOS, { label: '保持原样', ratio: saved.value.ratio }])
 
 // ---------- 同款项目 ----------
 

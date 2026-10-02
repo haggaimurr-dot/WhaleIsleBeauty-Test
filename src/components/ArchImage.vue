@@ -2,7 +2,6 @@
   <view
     class="arch-image"
     :class="{ 'arch-image--arch': shape === 'arch' }"
-    :style="ratio ? { paddingTop: `${ratio * 100}%` } : undefined"
   >
     <view v-if="placeholder" class="arch-image__fill arch-image__ph" :class="`arch-image__ph--${placeholder}`" />
     <image v-else class="arch-image__fill" :src="src" :mode="mode" />
@@ -12,7 +11,7 @@
 
 <script setup lang="ts">
 /**
- * 拱形图片。尺寸由父组件通过 class/style 给（或传 ratio 按宽度自适应高度）。
+ * 拱形图片。尺寸由父组件通过 class/style 给定，宽高都要写死，不随屏幕宽度变。
  * src 以 `placeholder:` 开头时显示渐变占位，例如 `placeholder:g2`，对应原型 g1–g6。
  * shape="rect" 时不做拱形，只保留占位能力，圆角由父组件的 class 决定（用于缩略图）。
  */
@@ -26,8 +25,6 @@ const PREFIX = 'placeholder:'
 const props = withDefaults(defineProps<{
   src: string
   shape?: 'arch' | 'rect'
-  /** 高/宽，传了之后高度随宽度变化，用于作品瀑布流 */
-  ratio?: number
   /** 图片底部的小字，例如“作品图” */
   label?: string
   mode?: 'aspectFill' | 'aspectFit' | 'widthFix'

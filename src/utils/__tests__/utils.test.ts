@@ -1,9 +1,10 @@
-/** 工具函数：日期、金额、分享、订阅消息 */
+/** 工具函数：日期、金额、分享、订阅消息、作品图尺寸 */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { addMinutes, datesFromToday, dayLabel, formatClock, formatDateCN, upcomingDates } from '@/utils/date'
 import { centsToYuanInput, formatPrice, parseYuan } from '@/utils/money'
 import { shareImage, sharePath } from '@/utils/share'
 import { requestSubscribe, SUBSCRIBE_TEMPLATES } from '@/utils/subscribe'
+import { workImageHeight } from '@/utils/work'
 import { useMockClock } from '@/test/helpers'
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
@@ -84,5 +85,13 @@ describe('subscribe', () => {
     } finally {
       Object.assign(SUBSCRIBE_TEMPLATES, saved)
     }
+  })
+})
+
+describe('work', () => {
+  it('瀑布流图片高度只有固定几档，最高 440rpx', () => {
+    expect([1, 1.25, 1.33, 1.5].map(workImageHeight)).toEqual([320, 360, 400, 440])
+    expect(workImageHeight(0.5)).toBe(320)
+    expect(workImageHeight(2)).toBe(440)
   })
 })

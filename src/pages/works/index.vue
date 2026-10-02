@@ -35,7 +35,7 @@
             hover-class="work--hover"
             @tap="openSheet(w)"
           >
-            <ArchImage class="work__img" :src="w.image" :ratio="w.ratio" />
+            <ArchImage class="work__img" :src="w.image" :style="{ height: `${workImageHeight(w.ratio)}rpx` }" />
             <view class="work__title">{{ w.title }}</view>
             <view class="work__artist">化妆师 {{ artistName(w.artistId) }}</view>
           </view>
@@ -73,6 +73,7 @@ import {
 } from '@/api'
 import { SHOP_NAME, shareImage, sharePath } from '@/utils/share'
 import { switchTab, takeTabParams } from '@/utils/tab'
+import { workImageHeight } from '@/utils/work'
 import AppButton from '@/components/AppButton.vue'
 import ArchImage from '@/components/ArchImage.vue'
 import Chip from '@/components/Chip.vue'
@@ -94,14 +95,14 @@ let requestSeq = 0
 
 const artistName = (id: ID) => artists.value.find(a => a.id === id)?.name ?? ''
 
-/** 两列瀑布流：每张放进当前较矮的一列。高度按宽度为 1 估算，文字部分约占 0.35 */
+/** 两列瀑布流：每张放进当前较矮的一列。按 rpx 估算，标题和化妆师两行加间距约 110 */
 const columns = computed(() => {
   const cols: Work[][] = [[], []]
   const heights = [0, 0]
   for (const w of works.value) {
     const i = heights[0] <= heights[1] ? 0 : 1
     cols[i].push(w)
-    heights[i] += w.ratio + 0.35
+    heights[i] += workImageHeight(w.ratio) + 110
   }
   return cols
 })
