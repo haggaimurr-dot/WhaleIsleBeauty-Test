@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// ownerNotifyApp 模板 ID 还没配时不发，测试里临时填一个
+// ownerNotifyApp 固定一个模板 ID，和真实配置无关
 func ownerNotifyApp(t *testing.T) (*App, *clock, *fakeNotifier) {
 	old := tmplOwner
 	tmplOwner = "tmpl-owner"
@@ -154,7 +154,10 @@ func TestOwnerNotifyErrors(t *testing.T) {
 }
 
 func TestOwnerNotifySkippedWithoutTemplate(t *testing.T) {
-	a, _, n := notifyApp(t) // tmplOwner 为空
+	old := tmplOwner
+	tmplOwner = ""
+	t.Cleanup(func() { tmplOwner = old })
+	a, _, n := notifyApp(t)
 	addQuota(t, a, 2)
 	paid(t, a, user(t, a, "o-alice"), "2026-10-03", "13:30")
 	if got := n.take(); len(got) != 0 {

@@ -30,18 +30,17 @@ import { USE_MOCK } from '@/api'
  *   thing6   地点       门店地址
  *   thing5   日程描述   如“明天见，素颜过来就好”
  *
- * owner — 预约变动提醒，发给店主。还没在后台选模板，先留空（留空时后端不发，排班页也不显示提醒额度）。
- *   选好后填这里和 server/notify.go 的 tmplOwner，字段 key 按「我的模板」详情改 notify.go 的 ownerKeyXxx：
- *   thing    预约项目   服务名
- *   time     预约时间   “2026年10月01日 14:00”
- *   thing    客人       昵称 + 化妆师，如“柚子27 · 小鲸”
- *   phrase   状态       新预约 / 已改期 / 已取消
- *   thing    备注       如“定金已付，等你确认”
+ * owner — 新订单提醒（公共模板 28904），发给店主：客人付完定金、改期、取消时发
+ *   thing44  项目名称   服务名
+ *   time43   预定日期   “2026年10月01日 14:00”
+ *   thing17  客人姓名   昵称 + 化妆师，如“柚子27 · 小鲸”
+ *   phrase12 订单状态   新预约 / 已改期 / 已取消（phrase 最多 5 个字）
+ *   thing15  订单备注   如“定金已付，等你确认”
  */
 export const SUBSCRIBE_TEMPLATES: Record<'confirmed' | 'reminder' | 'owner', string> = {
   confirmed: 'R6MUu_p5k6R-LPbVgm60btOsqWDVdb3Rbpykw8hH08Q',
   reminder: 'TpVpZ-EaOftX3_nW3RFYtx1BiBwpZbJRtJEfifCeM2Y',
-  owner: '',
+  owner: '-wVPwTNjeSYb3YC5OpABnetI94tdELo593BIVXSC0tc',
 }
 
 export type SubscribeKind = Exclude<keyof typeof SUBSCRIBE_TEMPLATES, 'owner'>
@@ -54,7 +53,7 @@ export function requestSubscribe(kinds: SubscribeKind[]): Promise<void> {
   })
 }
 
-/** 店主的预约变动提醒能不能用：模板配了，或者在 mock 演示里 */
+/** 店主的预约变动提醒能不能用：模板配了，或者在 mock 演示里（留空时 mock 直接当作同意） */
 export const OWNER_SUBSCRIBE_READY = !!SUBSCRIBE_TEMPLATES.owner || USE_MOCK
 
 /**

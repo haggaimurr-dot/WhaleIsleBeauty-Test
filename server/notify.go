@@ -221,16 +221,15 @@ func (a *App) SendReminders(ctx context.Context) error {
 // 也是一次性订阅：店主在排班页每同意一次，额度加一（AddOwnerNotify），每发一条减一。
 // 不经过 notices 表：这几个时机本身只会发生一次（支付回调重复到达时 MarkPaid 不会再走到这里）。
 
-// tmplOwner 小程序后台还没选模板，先留空，留空时不发也不扣额度。选好后和 src/utils/subscribe.ts 的 owner 一起填。
-// 下面的字段 key 也要按「我的模板」详情改
-var tmplOwner = ""
+// tmplOwner 新订单提醒（公共模板 28904），和 src/utils/subscribe.ts 的 owner 一致。留空时不发也不扣额度
+var tmplOwner = "-wVPwTNjeSYb3YC5OpABnetI94tdELo593BIVXSC0tc"
 
 const (
-	ownerKeyService  = "thing1"  // 预约项目
-	ownerKeyTime     = "time2"   // 预约时间
-	ownerKeyCustomer = "thing3"  // 客人 · 化妆师
-	ownerKeyStatus   = "phrase4" // 状态：新预约 / 已改期 / 已取消
-	ownerKeyNote     = "thing5"  // 备注
+	ownerKeyService  = "thing44"  // 项目名称
+	ownerKeyTime     = "time43"   // 预定日期
+	ownerKeyCustomer = "thing17"  // 客人姓名：客人 · 化妆师
+	ownerKeyStatus   = "phrase12" // 订单状态：新预约 / 已改期 / 已取消
+	ownerKeyNote     = "thing15"  // 订单备注
 
 	ownerMsgPage = "pages-owner/schedule/index"
 )
