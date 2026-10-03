@@ -171,6 +171,7 @@ export const httpApi: Api = {
   unblockSlot: (artistId, date, time) => request('DELETE', '/owner/blocks', { artistId, date, time }),
   getOwnerNotify: () => request('GET', '/owner/notify'),
   addOwnerNotify: (count) => request('POST', '/owner/notify', { count }),
+  listMonthStats: () => request('GET', '/owner/stats'),
 
   updateShop: (shop) => request('PUT', '/owner/shop', shop),
   createArtist: (req) => request('POST', '/owner/artists', req),

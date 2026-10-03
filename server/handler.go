@@ -216,6 +216,7 @@ func (a *App) Routes() http.Handler {
 	// ---------- 资料维护（店主端） ----------
 	h("GET /v1/owner/notify", list(a.OwnerNotify))
 	h("POST /v1/owner/notify", body(a.AddOwnerNotify))
+	h("GET /v1/owner/stats", list(a.MonthStats))
 
 	h("PUT /v1/owner/shop", body(a.UpdateShop))
 	h("POST /v1/owner/artists", body(a.CreateArtist))

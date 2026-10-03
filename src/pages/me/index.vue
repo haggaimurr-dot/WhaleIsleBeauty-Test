@@ -105,6 +105,9 @@
       <view v-if="me?.role === 'owner'" class="menu__row" hover-class="menu__row--hover" @tap="openOwner">
         店主工作台<text class="menu__hint">仅店主可见</text>
       </view>
+      <view v-if="me?.role === 'owner'" class="menu__row" hover-class="menu__row--hover" @tap="openStats">
+        经营统计<text class="menu__hint">每月预约和定金</text>
+      </view>
       <view v-if="me?.role === 'owner'" class="menu__row" hover-class="menu__row--hover" @tap="openCatalog">
         门店资料<text class="menu__hint">改了马上生效</text>
       </view>
@@ -272,6 +275,7 @@ function callShop() {
 }
 
 const openOwner = () => uni.navigateTo({ url: '/pages-owner/schedule/index' })
+const openStats = () => uni.navigateTo({ url: '/pages-owner/stats/index' })
 const openCatalog = () => uni.navigateTo({ url: '/pages-owner/catalog/index' })
 </script>
 

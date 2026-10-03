@@ -206,3 +206,13 @@ func set(vs ...string) map[string]bool {
 func isActive(status string) bool {
 	return status == StatusPendingPayment || status == StatusPendingConfirm || status == StatusConfirmed
 }
+
+// MonthStats 店主的月度汇总，口径见 src/api/types.ts
+type MonthStats struct {
+	Month     string `json:"month"`
+	Bookings  int    `json:"bookings"`
+	Cancelled int    `json:"cancelled"`
+	Deposit   int    `json:"deposit"`
+	Customers int    `json:"customers"`
+	Returning int    `json:"returning"`
+}

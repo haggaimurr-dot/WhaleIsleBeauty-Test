@@ -1,6 +1,6 @@
 import type {
   Artist, ArtistInput, Booking, CreateBookingReq, CreateBookingResp, DateStr, DaySchedule,
-  ID, Me, OwnerNotifyStatus, RescheduleReq, Service, ServiceInput, Shop, SkinProfile, SlotView, StyleCategory, TimeStr,
+  ID, Me, MonthStats, OwnerNotifyStatus, RescheduleReq, Service, ServiceInput, Shop, SkinProfile, SlotView, StyleCategory, TimeStr,
   UpdateSkinProfileReq, Work, WorkInput,
 } from './types'
 
@@ -117,6 +117,13 @@ export interface Api {
    * count 必须是 1–5 的整数，否则返回 400 UNKNOWN
    */
   addOwnerNotify(count: number): Promise<OwnerNotifyStatus>
+
+  // ---------- 经营统计（店主端，需要 owner 角色） ----------
+  /**
+   * GET /owner/stats  最近 6 个月（含本月）的月度汇总，本月在前。没有预约的月份各项为 0。
+   * 统计口径见 types.ts 的 MonthStats
+   */
+  listMonthStats(): Promise<MonthStats[]>
 
   // ---------- 资料维护（店主端，需要 owner 角色） ----------
   // 提交的内容整份替换，字段限制见 catalog.ts 的 validateXxx，前后端用同一套规则；不符合返回 400 UNKNOWN，message 说明哪里不对。

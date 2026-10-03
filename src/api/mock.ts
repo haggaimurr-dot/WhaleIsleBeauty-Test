@@ -7,10 +7,10 @@ import {
   ApiError, type Artist, type Booking, type BookingStatus, type CreateBookingReq,
   type DateStr, type DaySchedule, type ID, type Me, type OwnerBookingBrief, type OwnerNoticeKind,
   type ScheduleCell, type Service, type Shop, type SkinProfile, type SkinType, type SlotView,
-  type TimeStr, type UpdateSkinProfileReq, type Work, type WorkInput, type Occasion, TONE_LABEL,
+  type TimeStr, type UpdateSkinProfileReq, type Work, type WorkInput, type Occasion, type MonthStats, TONE_LABEL,
 } from './types'
 import { cleanArtist, cleanService, cleanShop, cleanWork, validateArtist, validateService, validateShop, validateWork } from './catalog'
-import { upcomingDates, datesFromToday, toTimestamp, hoursUntil, todayStr, nowTimeStr } from '../utils/date'
+import { upcomingDates, datesFromToday, toTimestamp, hoursUntil, todayStr, nowTimeStr, parse, toDateStr } from '../utils/date'
 
 // ---------- 种子数据 ----------
 
@@ -94,6 +94,8 @@ function skinSummary(p: SkinProfile): string | undefined {
 
 const OTHER_NAMES = ['林小姐', '陈小姐', '周小姐', '许小姐', '黄小姐', '吴小姐', '郑小姐', '何小姐']
 const OTHER_SERVICES = ['上镜妆', '约会妆', '新娘试妆', '主持妆', '面试妆']
+/** 和 OTHER_SERVICES 一一对应的定金，经营统计用 */
+const OTHER_DEPOSITS = [5000, 3000, 30000, 5000, 3000]
 const OTHER_OCCASIONS: Occasion[] = ['photo', 'date', 'event', 'interview']
 const ACTIVE: BookingStatus[] = ['pending_payment', 'pending_confirm', 'confirmed']
 const PAY_WINDOW_MS = 15 * 60 * 1000
@@ -137,6 +139,8 @@ const bookings: Booking[] = (
   status: 'completed', createdAt: `${date}T08:00:00+08:00`, canCancel: false,
 }))
 const blocks = new Set<string>()
+/** 付过定金的预约。Booking 上没有这个字段，经营统计要用：没付就取消的不算 */
+const paidIds = new Set<ID>(bookings.map(b => b.id))
 let seq = 100
 
 /**
@@ -233,6 +237,85 @@ function notifyOwner(kind: OwnerNoticeKind, b: Booking) {
 /** mock 专用：已经“发”给店主的提醒，测试用 */
 export const __ownerNotices = () => ownerNoticeLog.map(n => ({ ...n }))
 
+// ---------- 经营统计 ----------
+
+const STATS_MONTHS = 6
+/** 模拟的其他客人从这天开始有记录（门店开业），回头客从这里算起 */
+const OTHERS_SINCE: DateStr = '2026-03-01'
+
+/** 统计用的一条预约：只有付过定金的 */
+interface StatRecord { customer: ID, date: DateStr, time: TimeStr, cancelled: boolean, completed: boolean, deposit: number }
+
+/** 'YYYY-MM' 往前 n 个月 */
+function monthBefore(month: string, n: number) {
+  const [y, m] = month.split('-').map(Number)
+  const d = new Date(y, m - 1 - n, 1)
+  return toDateStr(d).slice(0, 7)
+}
+
+/**
+ * 排班里“其他客人”占着的格子（takenByOthers）当作付过定金的预约：过了开始时间算完成，没过算已确认。
+ * 另外少量没被占的格子当作付过定金后取消的。结果稳定，和排班看到的一致
+ */
+function otherRecords(until: DateStr): StatRecord[] {
+  const out: StatRecord[] = []
+  for (let d = parse(OTHERS_SINCE); toDateStr(d) <= until; d.setDate(d.getDate() + 1)) {
+    const date = toDateStr(d)
+    for (const a of artists) {
+      for (const time of TIMES) {
+        const h = hash(slotKey(a.id, date, time))
+        const taken = takenByOthers(a.id, date, time)
+        if (!taken && hash(slotKey(a.id, date, time) + '|cancel') % 25) continue
+        out.push({
+          customer: `other-${hash(slotKey(a.id, date, time) + '|who') % 1500}`, date, time, cancelled: !taken,
+          completed: taken && isPast(date, time), deposit: OTHER_DEPOSITS[h % OTHER_DEPOSITS.length],
+        })
+      }
+    }
+  }
+  return out
+}
+
+function myRecords(): StatRecord[] {
+  autoCancel()
+  return bookings
+    .filter(b => paidIds.has(b.id) && b.status !== 'pending_payment')
+    .map(b => ({
+      customer: me.id, date: b.date, time: b.time, cancelled: b.status === 'cancelled',
+      completed: b.status === 'completed', deposit: b.deposit,
+    }))
+}
+
+function monthStats(): MonthStats[] {
+  const thisMonth = todayStr().slice(0, 7)
+  const months = Array.from({ length: STATS_MONTHS }, (_, i) => monthBefore(thisMonth, i))
+  const records = [...otherRecords(`${thisMonth}-31`), ...myRecords()]
+  // 每位客人第一次到店完成的日期
+  const firstVisit = new Map<ID, DateStr>()
+  for (const r of records) {
+    const f = firstVisit.get(r.customer)
+    if (r.completed && (!f || r.date < f)) firstVisit.set(r.customer, r.date)
+  }
+  return months.map(month => {
+    const s: MonthStats = { month, bookings: 0, cancelled: 0, deposit: 0, customers: 0, returning: 0 }
+    // 这个月每位客人最后一次预约的日期
+    const last = new Map<ID, DateStr>()
+    for (const r of records) {
+      if (r.date.slice(0, 7) !== month) continue
+      if (r.cancelled) { s.cancelled++; continue }
+      s.bookings++
+      s.deposit += r.deposit
+      if ((last.get(r.customer) ?? '') < r.date) last.set(r.customer, r.date)
+    }
+    s.customers = last.size
+    for (const [c, date] of last) {
+      const f = firstVisit.get(c)
+      if (f && f < date) s.returning++
+    }
+    return s
+  })
+}
+
 // ---------- 资料维护 ----------
 
 function indexOrThrow<T extends { id: ID }>(list: T[], id: ID): number {
@@ -269,6 +352,7 @@ export async function __simulatePaid(id: ID) {
   if (b.status === 'pending_payment') {
     b.status = 'pending_confirm'
     delete b.payDeadline
+    paidIds.add(b.id)
     notifyOwner('new', b)
   }
 }
@@ -487,6 +571,12 @@ export const mockApi: Api = {
     if (!Number.isInteger(count) || count < 1 || count > 5) throw new ApiError('UNKNOWN', '额度一次只能加 1–5 条')
     ownerQuota += count
     return { quota: ownerQuota }
+  },
+
+  async listMonthStats() {
+    await delay()
+    requireOwner()
+    return monthStats()
   },
 
   async updateShop(req) {

@@ -289,6 +289,32 @@ func (s *mysqlStore) DueBookings(ctx context.Context, now time.Time) ([]*Booking
 		StatusPendingPayment, now, StatusPendingConfirm, now, StatusConfirmed, now)
 }
 
+func (s *mysqlStore) PaidBookingsBetween(ctx context.Context, from, to string) ([]*BookingRow, error) {
+	return s.queryBookings(ctx, `date >= ? AND date < ? AND paid_at IS NOT NULL`, from, to)
+}
+
+func (s *mysqlStore) FirstVisits(ctx context.Context, userIDs []string) (map[string]string, error) {
+	out := map[string]string{}
+	if len(userIDs) == 0 {
+		return out, nil
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT user_id, MIN(date) FROM bookings
+		WHERE status = ? AND user_id IN (`+placeholders(len(userIDs))+`) GROUP BY user_id`,
+		append([]any{StatusCompleted}, toArgs(userIDs)...)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, date string
+		if err := rows.Scan(&id, &date); err != nil {
+			return nil, err
+		}
+		out[id] = date
+	}
+	return out, rows.Err()
+}
+
 // ---------- 休息时段 ----------
 
 func (s *mysqlStore) BlocksOn(ctx context.Context, date string) (map[string]bool, error) {

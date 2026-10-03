@@ -74,7 +74,7 @@ src/
   test/            # 测试工具（helpers.ts）
 ```
 
-`server/` 是 Go 后端（只用标准库 + MySQL 驱动），业务规则在 `app.go`，要和 `mock.ts` 的行为一致；改了契约时两边一起改。
+`server/` 是 Go 后端（只用标准库 + MySQL 驱动），业务规则在 `app.go`（经营统计在 `stats.go`），要和 `mock.ts` 的行为一致；改了契约时两边一起改。
 部署在云托管服务 `jingyu-api`，环境变量见 `server/main.go` 顶部注释。还没有商户号，`PAY_MODE=fake` 时由 `/v1/bookings/:id/fake-paid` 代替支付回调，只有店主和 `FAKE_PAY_OPENIDS` 里的测试人员能用。`PAY_MODE` 没有默认值，不设服务起不来，防止假支付被带上线。
 订阅消息由后端发（`server/notify.go`）：店主确认时发预约确认，每分钟的定时任务在开始前一天 18:00 后发到店提醒；客人付完定金、改期、取消时给店主发预约变动提醒（一次性订阅，额度记在 `owner_notify` 表，店主在排班页续）；模板 ID 和字段要和 `src/utils/subscribe.ts` 一致。
 表结构在 `server/migrations/`，启动时按文件名顺序执行没跑过的；已经执行过的文件不要改，改表结构加新文件。
@@ -100,6 +100,7 @@ src/
 | pages/me/index | 我的预约 | 我的预约 |
 | pages/me/skin | 肤质档案（普通页面，从“我的”进入） | 无（原型只有入口，按预约页表单样式做） |
 | pages-owner/schedule/index | 店主排班（分包） | 排班 |
+| pages-owner/stats/index | 经营统计（分包，从“我的”进入，仅店主）：近 6 个月的预约数、定金收入、取消率、回头客，口径见 `types.ts` 的 `MonthStats` | 无 |
 | pages-owner/catalog/index | 门店资料（分包，从“我的”进入，仅店主） | 无（按肤质档案页的表单样式做） |
 | pages-owner/catalog/shop | 门店信息编辑 | 无 |
 | pages-owner/catalog/artists | 化妆师列表 | 无 |

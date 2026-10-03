@@ -15,6 +15,7 @@
 			"root": "pages-owner",
 			"pages": [
 				{ "path": "schedule/index", "style": { "disableScroll": true, "navigationBarTitleText": "工作台" } },
+				{ "path": "stats/index", "style": { "disableScroll": true, "navigationBarTitleText": "经营统计" } },
 				{ "path": "catalog/index", "style": { "disableScroll": true, "navigationBarTitleText": "门店资料" } },
 				{ "path": "catalog/shop", "style": { "disableScroll": true, "navigationBarTitleText": "门店信息" } },
 				{ "path": "catalog/artists", "style": { "disableScroll": true, "navigationBarTitleText": "化妆师" } },

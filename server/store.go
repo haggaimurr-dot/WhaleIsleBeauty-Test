@@ -74,6 +74,10 @@ type Store interface {
 	ActiveBookingsOn(ctx context.Context, date string) ([]*BookingRow, error)
 	// DueBookings 返回需要自动流转的预约：付款超时、到点没确认、已确认且已结束
 	DueBookings(ctx context.Context, now time.Time) ([]*BookingRow, error)
+	// PaidBookingsBetween 到店日期在 [from, to) 里、付过定金的预约（含付过之后取消的），经营统计用
+	PaidBookingsBetween(ctx context.Context, from, to string) ([]*BookingRow, error)
+	// FirstVisits 这些客人第一次到店完成的日期，没完成过的不在结果里
+	FirstVisits(ctx context.Context, userIDs []string) (map[string]string, error)
 
 	// BlocksOn 返回这一天设了休息的时段，key 是 artistID|time
 	BlocksOn(ctx context.Context, date string) (map[string]bool, error)
@@ -275,6 +279,25 @@ func (s *memStore) DueBookings(_ context.Context, now time.Time) ([]*BookingRow,
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.filter(func(b *BookingRow) bool { return isDue(b, now) }), nil
+}
+
+func (s *memStore) PaidBookingsBetween(_ context.Context, from, to string) ([]*BookingRow, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.filter(func(b *BookingRow) bool { return b.PaidAt != nil && b.Date >= from && b.Date < to }), nil
+}
+
+func (s *memStore) FirstVisits(_ context.Context, userIDs []string) (map[string]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	want := set(userIDs...)
+	out := map[string]string{}
+	for _, b := range s.bookings {
+		if b.Status == StatusCompleted && want[b.UserID] && (out[b.UserID] == "" || b.Date < out[b.UserID]) {
+			out[b.UserID] = b.Date
+		}
+	}
+	return out, nil
 }
 
 func (s *memStore) BlocksOn(_ context.Context, date string) (map[string]bool, error) {

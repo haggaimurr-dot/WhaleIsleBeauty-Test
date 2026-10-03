@@ -310,6 +310,27 @@ export interface DaySchedule {
   }
 }
 
+// ---------- 经营统计（店主端） ----------
+
+/**
+ * 一个月的汇总。按预约的到店日期（date）归到月份，本月也算上已经约了、还没到的。
+ * 只统计付过定金的预约：没付就取消、付款超时的不算，还在待付定金的也不算。
+ */
+export interface MonthStats {
+  /** 'YYYY-MM' */
+  month: string
+  /** 付过定金、没有取消的预约数（待确认、已确认、已完成） */
+  bookings: number
+  /** 付过定金后取消的（客人取消、店里没确认自动取消）。取消率 = cancelled / (bookings + cancelled)，前端算 */
+  cancelled: number
+  /** 定金收入：bookings 里这些预约的定金合计。取消的定金都已原路退回，不算 */
+  deposit: Cents
+  /** bookings 里有几位不同的客人 */
+  customers: number
+  /** customers 里的回头客：在这个月最后一次预约的日期之前，已经到店完成过至少一次 */
+  returning: number
+}
+
 // ---------- 错误 ----------
 
 export type ErrorCode =
