@@ -72,6 +72,8 @@ type Store interface {
 	UpdateBooking(ctx context.Context, b *BookingRow, from string) error
 	BookingsByUser(ctx context.Context, userID string, statuses []string) ([]*BookingRow, error)
 	ActiveBookingsOn(ctx context.Context, date string) ([]*BookingRow, error)
+	// ScheduledBookingsOn 排班要显示的预约：进行中的、已完成的、标记了没来的
+	ScheduledBookingsOn(ctx context.Context, date string) ([]*BookingRow, error)
 	// DueBookings 返回需要自动流转的预约：付款超时、到点没确认、已确认且已结束
 	DueBookings(ctx context.Context, now time.Time) ([]*BookingRow, error)
 	// PaidBookingsBetween 到店日期在 [from, to) 里、付过定金的预约（含付过之后取消的），经营统计用
@@ -106,6 +108,10 @@ type Store interface {
 	DeleteCatalogItem(ctx context.Context, kind, id string) error
 	// ActiveBookingExists 这位化妆师（或这个项目）还有没有进行中的预约。两个参数只传一个，另一个为空
 	ActiveBookingExists(ctx context.Context, artistID, serviceID string) (bool, error)
+}
+
+func onSchedule(b *BookingRow) bool {
+	return isActive(b.Status) || b.Status == StatusCompleted || b.CancelReason == ReasonNoShow
 }
 
 func isDue(b *BookingRow, now time.Time) bool {
@@ -273,6 +279,12 @@ func (s *memStore) ActiveBookingsOn(_ context.Context, date string) ([]*BookingR
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.filter(func(b *BookingRow) bool { return b.Date == date && isActive(b.Status) }), nil
+}
+
+func (s *memStore) ScheduledBookingsOn(_ context.Context, date string) ([]*BookingRow, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.filter(func(b *BookingRow) bool { return b.Date == date && onSchedule(b) }), nil
 }
 
 func (s *memStore) DueBookings(_ context.Context, now time.Time) ([]*BookingRow, error) {

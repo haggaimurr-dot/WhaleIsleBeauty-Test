@@ -86,7 +86,7 @@
             <view class="past__service">{{ b.serviceName }}</view>
             {{ formatMonthDay(b.date) }}　化妆师 {{ b.artistName }}
             <StatusBadge v-if="b.status === 'cancelled'" class="past__badge" :status="b.status" />
-            <view v-if="cancelNote(b)" class="past__why" :class="{ 'past__why--refund': b.cancelReason === 'not_confirmed' }">
+            <view v-if="cancelNote(b)" class="past__why" :class="{ 'past__why--refund': b.cancelReason === 'not_confirmed' || b.cancelReason === 'no_show' }">
               {{ cancelNote(b) }}
             </view>
           </view>
@@ -157,10 +157,11 @@ const visitText = computed(() => {
 
 const isUnpaid = (b: Booking) => b.status === 'pending_payment'
 
-/** 自动取消的说明；客人自己取消的不用再解释 */
+/** 自动取消、店里记了没来的说明；客人自己取消（含店里代取消）的不用再解释 */
 function cancelNote(b: Booking) {
   if (b.cancelReason === 'not_confirmed') return `店里没来得及确认，定金 ${formatPrice(b.deposit)} 已原路退回`
   if (b.cancelReason === 'pay_timeout') return '没有付定金，时段已经放出去了'
+  if (b.cancelReason === 'no_show') return `这次没等到你，定金 ${formatPrice(b.deposit)} 已原路退回`
   return ''
 }
 

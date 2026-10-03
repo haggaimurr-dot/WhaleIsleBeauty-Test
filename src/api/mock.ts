@@ -147,6 +147,7 @@ let seq = 100
  * 模拟后端的定时任务：
  * - 超过付款截止时间的 pending_payment 自动取消，释放时段
  * - 到了开始时间还没确认的 pending_confirm 自动取消，定金原路退回
+ * - 已确认的过了结束时间算完成
  */
 function autoCancel() {
   const now = Date.now()
@@ -158,6 +159,8 @@ function autoCancel() {
     } else if (b.status === 'pending_confirm' && isPast(b.date, b.time)) {
       b.status = 'cancelled'
       b.cancelReason = 'not_confirmed'
+    } else if (b.status === 'confirmed' && parse(b.date, b.time).getTime() + b.durationMin * 60_000 <= now) {
+      b.status = 'completed'
     }
   }
 }
@@ -182,6 +185,21 @@ function findActive(artistId: ID, date: DateStr, time: TimeStr) {
 function isPast(date: DateStr, time: TimeStr) {
   return date < todayStr() || (date === todayStr() && time <= nowTimeStr())
 }
+
+/** 排班格子里的预约：进行中的优先，其次是已经完成的、标记了没来的 */
+function scheduledAt(artistId: ID, date: DateStr, time: TimeStr) {
+  const here = bookings.filter(b => b.artistId === artistId && b.date === date && b.time === time)
+  return findActive(artistId, date, time)
+    ?? here.find(b => b.status === 'completed')
+    ?? here.find(b => b.cancelReason === 'no_show')
+}
+
+/** 店主能不能替客人改期、取消：还在进行中，而且没开始 */
+const ownerCanChange = (b: Booking) => ACTIVE.includes(b.status) && !isPast(b.date, b.time)
+
+/** 店主能不能标记没来：已确认或已完成，开始时间过了，还是预约当天 */
+const canMarkNoShow = (b: Booking) =>
+  (b.status === 'confirmed' || b.status === 'completed') && isPast(b.date, b.time) && b.date === todayStr()
 
 function isAvailable(artistId: ID, date: DateStr, time: TimeStr, ignoreBookingId?: ID) {
   const active = findActive(artistId, date, time)
@@ -244,7 +262,7 @@ const STATS_MONTHS = 6
 const OTHERS_SINCE: DateStr = '2026-03-01'
 
 /** 统计用的一条预约：只有付过定金的 */
-interface StatRecord { customer: ID, date: DateStr, time: TimeStr, cancelled: boolean, completed: boolean, deposit: number }
+interface StatRecord { customer: ID, date: DateStr, time: TimeStr, cancelled: boolean, noShow: boolean, completed: boolean, deposit: number }
 
 /** 'YYYY-MM' 往前 n 个月 */
 function monthBefore(month: string, n: number) {
@@ -268,6 +286,8 @@ function otherRecords(until: DateStr): StatRecord[] {
         if (!taken && hash(slotKey(a.id, date, time) + '|cancel') % 25) continue
         out.push({
           customer: `other-${hash(slotKey(a.id, date, time) + '|who') % 1500}`, date, time, cancelled: !taken,
+          // 已经过去的取消里，少数是客人没来
+          noShow: !taken && isPast(date, time) && hash(slotKey(a.id, date, time) + '|noshow') % 4 === 0,
           completed: taken && isPast(date, time), deposit: OTHER_DEPOSITS[h % OTHER_DEPOSITS.length],
         })
       }
@@ -282,7 +302,7 @@ function myRecords(): StatRecord[] {
     .filter(b => paidIds.has(b.id) && b.status !== 'pending_payment')
     .map(b => ({
       customer: me.id, date: b.date, time: b.time, cancelled: b.status === 'cancelled',
-      completed: b.status === 'completed', deposit: b.deposit,
+      noShow: b.cancelReason === 'no_show', completed: b.status === 'completed', deposit: b.deposit,
     }))
 }
 
@@ -297,12 +317,16 @@ function monthStats(): MonthStats[] {
     if (r.completed && (!f || r.date < f)) firstVisit.set(r.customer, r.date)
   }
   return months.map(month => {
-    const s: MonthStats = { month, bookings: 0, cancelled: 0, deposit: 0, customers: 0, returning: 0 }
+    const s: MonthStats = { month, bookings: 0, cancelled: 0, noShow: 0, deposit: 0, customers: 0, returning: 0 }
     // 这个月每位客人最后一次预约的日期
     const last = new Map<ID, DateStr>()
     for (const r of records) {
       if (r.date.slice(0, 7) !== month) continue
-      if (r.cancelled) { s.cancelled++; continue }
+      if (r.cancelled) {
+        s.cancelled++
+        if (r.noShow) s.noShow++
+        continue
+      }
       s.bookings++
       s.deposit += r.deposit
       if ((last.get(r.customer) ?? '') < r.date) last.set(r.customer, r.date)
@@ -489,7 +513,7 @@ export const mockApi: Api = {
     for (const time of TIMES) {
       for (const a of artists) {
         const cell: ScheduleCell = { artistId: a.id, time, state: 'free' }
-        const real = findActive(a.id, date, time)
+        const real = scheduledAt(a.id, date, time)
         if (real) {
           const brief: OwnerBookingBrief = {
             id: real.id, customerName: me.nickname, serviceName: real.serviceName, status: real.status,
@@ -497,6 +521,7 @@ export const mockApi: Api = {
             canConfirm: real.status === 'pending_confirm' && !isPast(real.date, real.time),
             durationMin: real.durationMin, occasion: real.occasion, skinType: real.skinType,
             profile: hasProfile(skinProfile) ? clone(skinProfile) : undefined,
+            canChange: ownerCanChange(real), canMarkNoShow: canMarkNoShow(real),
           }
           // pending_payment 也算占着：付款截止前为客人保留
           cell.state = real.status === 'pending_confirm' ? 'pending' : 'booked'
@@ -521,8 +546,9 @@ export const mockApi: Api = {
         } else if (blocks.has(slotKey(a.id, date, time))) {
           cell.state = 'blocked'
         }
-        const unpaid = cell.booking?.status === 'pending_payment'
-        if ((cell.state === 'booked' || cell.state === 'pending') && !unpaid) stats.total++
+        // 待付定金的还没算数，没来的不算当天的预约
+        const uncounted = cell.booking?.status === 'pending_payment' || cell.booking?.status === 'cancelled'
+        if ((cell.state === 'booked' || cell.state === 'pending') && !uncounted) stats.total++
         if (cell.state === 'pending') stats.pending++
         if (cell.state === 'pending' && !cell.booking?.canConfirm) stats.stale++
         if (cell.state === 'free') stats.free++
@@ -539,6 +565,54 @@ export const mockApi: Api = {
     if (b.status !== 'pending_confirm') throw new ApiError('INVALID_STATE', '这个预约已经处理过了')
     if (isPast(b.date, b.time)) throw new ApiError('INVALID_STATE', '预约时间已经过了，不能再确认')
     b.status = 'confirmed'
+    return out(b)
+  },
+
+  async ownerCancelBooking(id) {
+    await delay()
+    requireOwner()
+    const b = getBookingOrThrow(id)
+    if (!ownerCanChange(b)) throw new ApiError('INVALID_STATE', ACTIVE.includes(b.status) ? '预约已经开始了，不能再取消' : '这个预约已经结束了')
+    // 付过的定金原路退回；店里自己操作的，不用再提醒店主
+    b.status = 'cancelled'
+    b.cancelReason = 'customer'
+    delete b.payDeadline
+    return out(b)
+  },
+
+  async ownerRescheduleBooking(id, req) {
+    await delay(400)
+    requireOwner()
+    const b = getBookingOrThrow(id)
+    if (!ownerCanChange(b)) throw new ApiError('INVALID_STATE', ACTIVE.includes(b.status) ? '预约已经开始了，不能再改期' : '这个预约已经结束了')
+    getOrThrow(artists, req.artistId)
+    if (!datesFromToday(8).includes(req.date)) throw new ApiError('INVALID_STATE', '这一天还排不到，换一天吧')
+    if (isPast(req.date, req.time)) throw new ApiError('SLOT_TAKEN', '这个时间已经过去了，换一个吧')
+    if (blocks.has(slotKey(req.artistId, req.date, req.time))) {
+      throw new ApiError('SLOT_TAKEN', '这个时段设了休息，先恢复可约再改过来')
+    }
+    if (!isAvailable(req.artistId, req.date, req.time, b.id)) {
+      throw new ApiError('SLOT_TAKEN', '这个时间已经有预约了，换一个吧')
+    }
+    Object.assign(b, {
+      artistId: req.artistId, artistName: artistName(req.artistId),
+      date: req.date, time: req.time,
+      // 店里和客人说好了的，付过定金的直接算确认；还没付的仍要付
+      status: b.status === 'pending_payment' ? 'pending_payment' : 'confirmed',
+    })
+    return out(b)
+  },
+
+  async markNoShow(id) {
+    await delay()
+    requireOwner()
+    const b = getBookingOrThrow(id)
+    if (!canMarkNoShow(b)) {
+      throw new ApiError('INVALID_STATE', isPast(b.date, b.time) ? '只能在预约当天标记没来' : '预约还没开始，不能标记没来')
+    }
+    // 定金同样原路退回
+    b.status = 'cancelled'
+    b.cancelReason = 'no_show'
     return out(b)
   },
 

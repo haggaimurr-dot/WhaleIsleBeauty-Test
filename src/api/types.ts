@@ -208,11 +208,12 @@ export interface Booking {
 }
 
 /**
- * customer：客人自己取消（含店里代客人取消）
+ * customer：客人自己取消（含店里代客人取消，定金都原路退回）
  * pay_timeout：超过 15 分钟没付定金
  * not_confirmed：到了开始时间店里还没确认，定金已原路退回
+ * no_show：客人没来，店主在预约当天标记的，定金同样原路退回
  */
-export type CancelReason = 'customer' | 'pay_timeout' | 'not_confirmed'
+export type CancelReason = 'customer' | 'pay_timeout' | 'not_confirmed' | 'no_show'
 
 export interface CreateBookingReq {
   serviceId: ID
@@ -282,11 +283,20 @@ export interface OwnerBookingBrief {
   skinType?: SkinType
   /** 客人的肤质档案，下单时的最新版本；没填过不返回。过敏情况已经合并在 note 里 */
   profile?: SkinProfile
+  /**
+   * 服务端计算：进行中（待付定金、待确认、已确认）且开始时间还没到才为 true，
+   * 前端据此显示“改期”“取消预约”（店主替客人操作，不受 24 小时限制）
+   */
+  canChange?: boolean
+  /** 服务端计算：已确认或已完成、开始时间已过、而且还是预约当天，才为 true，前端据此显示“客人没来” */
+  canMarkNoShow?: boolean
 }
 
 /**
  * 客人已下单但还没付定金（booking.status 为 pending_payment）的格子返回 booked：
  * 时段在付款截止前为客人保留，店主不能设休息；它不计入 stats.total，超时后后端自动放出。
+ * 已经结束的预约也照常返回：已完成（completed）和标记了没来（cancelled，cancelReason 为 no_show）的都是 booked，
+ * 没来的不计入 stats.total。其他取消的预约不返回，格子按空闲或已过处理。
  */
 export interface ScheduleCell {
   artistId: ID
@@ -321,8 +331,10 @@ export interface MonthStats {
   month: string
   /** 付过定金、没有取消的预约数（待确认、已确认、已完成） */
   bookings: number
-  /** 付过定金后取消的（客人取消、店里没确认自动取消）。取消率 = cancelled / (bookings + cancelled)，前端算 */
+  /** 付过定金后取消的（客人取消、店里没确认自动取消、客人没来）。取消率 = cancelled / (bookings + cancelled)，前端算 */
   cancelled: number
+  /** cancelled 里标记了没来的 */
+  noShow: number
   /** 定金收入：bookings 里这些预约的定金合计。取消的定金都已原路退回，不算 */
   deposit: Cents
   /** bookings 里有几位不同的客人 */

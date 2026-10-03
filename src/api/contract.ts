@@ -89,6 +89,7 @@ export interface Api {
   // - pending_payment 过了 payDeadline → cancelled，cancelReason = pay_timeout
   // - pending_confirm 到了开始时间还没确认 → cancelled，cancelReason = not_confirmed，定金原路退回
   //   不发订阅消息（没有对应模板），客人在「已完成」里看到原因。排班里 stats.stale 因此通常为 0，只在定时任务跑之前短暂出现
+  // - confirmed 过了结束时间（开始时间 + durationMin）→ completed。契约里没有“到店完成”的接口，没来的由店主当天标记（markNoShow）
 
   // ---------- 排班（店主端，需要 owner 角色） ----------
   /** GET /owner/dates  排班可查看的日期（从今天起），和客人端的 /dates 不同，包含今天 */
@@ -100,6 +101,24 @@ export interface Api {
   getDaySchedule(date: DateStr): Promise<DaySchedule>
   /** POST /owner/bookings/:id/confirm  确认后给客人发订阅消息。开始时间已过返回 INVALID_STATE */
   confirmBooking(id: ID): Promise<Booking>
+  /**
+   * POST /owner/bookings/:id/cancel  店主替客人取消（客人打电话来说不来了）。
+   * 不受 24 小时限制；开始时间已过或预约已结束返回 INVALID_STATE。付过的定金原路退回，cancelReason 记为 customer。
+   * 不给客人和店主发提醒
+   */
+  ownerCancelBooking(id: ID): Promise<Booking>
+  /**
+   * POST /owner/bookings/:id/reschedule  店主替客人改期，body 同 RescheduleReq。
+   * 不受 24 小时限制，可以改到排班能看的任何一天（含今天）；新时段已过去、设了休息或有预约返回 SLOT_TAKEN。
+   * 店里和客人已经说好了，付过定金的改完直接是 confirmed，并按新时间给客人发预约确认；还没付的仍是 pending_payment
+   */
+  ownerRescheduleBooking(id: ID, req: RescheduleReq): Promise<Booking>
+  /**
+   * POST /owner/bookings/:id/no-show  客人没来。只能在预约当天、开始时间之后标记，
+   * 状态是 confirmed 或 completed（过了结束时间已经自动完成）才行，否则返回 INVALID_STATE。
+   * 标记后 cancelled，cancelReason = no_show，定金原路退回；不能撤销
+   */
+  markNoShow(id: ID): Promise<Booking>
   /** PUT /owner/blocks  body: { artistId, date, time }  时段已过去或已有预约返回 INVALID_STATE */
   blockSlot(artistId: ID, date: DateStr, time: TimeStr): Promise<void>
   /** DELETE /owner/blocks  body: { artistId, date, time }  时段已过去返回 INVALID_STATE */

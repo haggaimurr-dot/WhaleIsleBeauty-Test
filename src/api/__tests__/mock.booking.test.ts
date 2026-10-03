@@ -123,7 +123,7 @@ describe('取消和改期', () => {
 })
 
 describe('自动取消：到时间店里还没确认', () => {
-  it('没确认的取消并记为 not_confirmed；已确认的不受影响', async () => {
+  it('没确认的取消并记为 not_confirmed；已确认的过了结束时间算完成', async () => {
     const date = await day(0)
     const tA = await freeSlot('a1', date)
     const tB = await freeSlot('a2', date)
@@ -135,7 +135,7 @@ describe('自动取消：到时间店里还没确认', () => {
 
     vi.setSystemTime(new Date(2026, 9, 1, 23, 0))
     expect(await api.getBooking(a.id)).toMatchObject({ status: 'cancelled', cancelReason: 'not_confirmed' })
-    expect((await api.getBooking(b.id)).status).toBe('confirmed')
+    expect((await api.getBooking(b.id)).status).toBe('completed')
     expect((await api.listMyBookings('upcoming')).some(x => x.id === a.id)).toBe(false)
   })
 })

@@ -142,6 +142,10 @@ type OwnerBookingBrief struct {
 	Occasion     string       `json:"occasion,omitempty"`
 	SkinType     string       `json:"skinType,omitempty"`
 	Profile      *SkinProfile `json:"profile,omitempty"`
+	// CanChange 店主能替客人改期、取消：进行中且还没开始
+	CanChange bool `json:"canChange"`
+	// CanMarkNoShow 店主能标记客人没来：已确认或已完成、开始时间已过、还是预约当天
+	CanMarkNoShow bool `json:"canMarkNoShow"`
 }
 
 type ScheduleCell struct {
@@ -183,6 +187,7 @@ const (
 	ReasonCustomer     = "customer"
 	ReasonPayTimeout   = "pay_timeout"
 	ReasonNotConfirmed = "not_confirmed"
+	ReasonNoShow       = "no_show"
 )
 
 var (
@@ -212,6 +217,7 @@ type MonthStats struct {
 	Month     string `json:"month"`
 	Bookings  int    `json:"bookings"`
 	Cancelled int    `json:"cancelled"`
+	NoShow    int    `json:"noShow"`
 	Deposit   int    `json:"deposit"`
 	Customers int    `json:"customers"`
 	Returning int    `json:"returning"`

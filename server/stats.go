@@ -57,6 +57,9 @@ func (a *App) MonthStats(ctx context.Context, u *User) ([]MonthStats, error) {
 		}
 		if b.Status == StatusCancelled {
 			s.Cancelled++
+			if b.CancelReason == ReasonNoShow {
+				s.NoShow++
+			}
 			continue
 		}
 		s.Bookings++

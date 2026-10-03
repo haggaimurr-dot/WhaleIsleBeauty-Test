@@ -200,6 +200,15 @@ func (a *App) Routes() http.Handler {
 		v, err := a.ConfirmBooking(r.Context(), userOf(r), r.PathValue("id"))
 		reply(w, r, v, err)
 	})
+	h("POST /v1/owner/bookings/{id}/cancel", func(w http.ResponseWriter, r *http.Request) {
+		v, err := a.OwnerCancelBooking(r.Context(), userOf(r), r.PathValue("id"))
+		reply(w, r, v, err)
+	})
+	h("POST /v1/owner/bookings/{id}/reschedule", bodyID(a.OwnerRescheduleBooking))
+	h("POST /v1/owner/bookings/{id}/no-show", func(w http.ResponseWriter, r *http.Request) {
+		v, err := a.MarkNoShow(r.Context(), userOf(r), r.PathValue("id"))
+		reply(w, r, v, err)
+	})
 	slot := func(f func(context.Context, *User, SlotReq) error) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			var req SlotReq

@@ -283,6 +283,11 @@ func (s *mysqlStore) ActiveBookingsOn(ctx context.Context, date string) ([]*Book
 	return s.queryBookings(ctx, `date = ? AND active_slot IS NOT NULL`, date)
 }
 
+func (s *mysqlStore) ScheduledBookingsOn(ctx context.Context, date string) ([]*BookingRow, error) {
+	return s.queryBookings(ctx, `date = ? AND (active_slot IS NOT NULL OR status = ? OR cancel_reason = ?)`,
+		date, StatusCompleted, ReasonNoShow)
+}
+
 func (s *mysqlStore) DueBookings(ctx context.Context, now time.Time) ([]*BookingRow, error) {
 	now = now.UTC()
 	return s.queryBookings(ctx, `(status = ? AND pay_deadline <= ?) OR (status = ? AND start_at <= ?) OR (status = ? AND end_at <= ?)`,

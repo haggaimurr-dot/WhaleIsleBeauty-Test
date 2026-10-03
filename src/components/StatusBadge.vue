@@ -1,5 +1,5 @@
 <template>
-  <text class="status-badge" :class="`status-badge--${TONE[status]}`">{{ STATUS_LABEL[status] }}</text>
+  <text class="status-badge" :class="`status-badge--${TONE[status]}`">{{ label || STATUS_LABEL[status] }}</text>
 </template>
 
 <script setup lang="ts">
@@ -11,7 +11,8 @@ import { STATUS_LABEL, type BookingStatus } from '@/api'
 
 defineOptions({ options: { virtualHost: true } })
 
-defineProps<{ status: BookingStatus }>()
+/** label：需要换个说法时用，例如店主端把没来的预约写成“没来”，颜色仍按 status */
+defineProps<{ status: BookingStatus; label?: string }>()
 
 const TONE: Record<BookingStatus, 'wait' | 'ok' | 'past'> = {
   pending_payment: 'wait',

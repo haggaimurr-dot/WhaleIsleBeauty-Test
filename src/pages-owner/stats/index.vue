@@ -31,7 +31,7 @@
         <view class="tile">
           <view class="tile__label">取消率</view>
           <view class="tile__num">{{ cancelRate(current) }}</view>
-          <view class="tile__sub">{{ current.cancelled ? `付了定金又取消 ${current.cancelled} 单` : '没有付了定金又取消的' }}</view>
+          <view class="tile__sub">{{ cancelSub }}</view>
         </view>
         <view class="tile">
           <view class="tile__label">回头客</view>
@@ -102,6 +102,13 @@ const bookingDelta = computed(() => {
   if (!cur || !prev) return '再往前没有对比'
   const d = cur.bookings - prev.bookings
   return d > 0 ? `比上月多 ${d} 单` : d < 0 ? `比上月少 ${-d} 单` : '和上月一样'
+})
+
+/** 没来的算在取消里，有的话单独点出来；旧后端没有 noShow 字段时按 0 */
+const cancelSub = computed(() => {
+  const cur = current.value
+  if (!cur?.cancelled) return '没有付了定金又取消的'
+  return cur.noShow ? `取消 ${cur.cancelled} 单，其中 ${cur.noShow} 单没来` : `付了定金又取消 ${cur.cancelled} 单`
 })
 
 const monthTitle = (month: string) => `${Number(month.slice(5))} 月`
