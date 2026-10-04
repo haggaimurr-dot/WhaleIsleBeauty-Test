@@ -46,7 +46,8 @@
         </view>
 
         <!-- 循环变量别用单字母：uni-app 编译后的数据键也是单字母，会撞上（之前 p 撞了 dateText，提醒条渲染不出来） -->
-        <view v-for="pend in pendings" :key="pend.booking.id" class="pending">
+        <!-- 改期挑格子时先收起，免得和上面的提示条抢注意力 -->
+        <view v-for="pend in (moving ? [] : pendings)" :key="pend.booking.id" class="pending">
           <view class="pending__text">
             <view class="pending__name">新预约：{{ pend.booking.customerName }}</view>
             {{ dateText }} {{ pend.time }}　{{ pend.artistName }}　{{ pend.booking.serviceName }}　定金已付
@@ -478,7 +479,10 @@ async function pickMoveTarget(c: ScheduleCell, d: DateStr) {
   if (!yes) return
   const ok = await run(
     cellKey(c),
-    () => api.ownerRescheduleBooking(m.booking.id, { artistId: c.artistId, date: d, time: c.time }),
+    async () => {
+      const b = await api.ownerRescheduleBooking(m.booking.id, { artistId: c.artistId, date: d, time: c.time })
+      if (b.status === 'confirmed') confirmedHere.value.add(b.id)
+    },
     `已改到 ${formatMonthDay(d)} ${c.time}`,
     'move',
   )
