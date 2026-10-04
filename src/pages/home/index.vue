@@ -75,7 +75,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
+import { onLoad, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import { api, errorText, CATEGORY_LABEL, type Service, type StyleCategory } from '@/api'
 import { formatPrice } from '@/utils/money'
 import { SHOP_NAME, sharePath } from '@/utils/share'
@@ -120,10 +120,9 @@ async function load() {
 
 onLoad(load)
 
-onShareAppMessage(() => ({
-  title: `${SHOP_NAME}｜私人化妆工作室，素颜过来就好`,
-  path: sharePath('/pages/home/index'),
-}))
+const SHARE_TITLE = `${SHOP_NAME}｜私人化妆工作室，素颜过来就好`
+onShareAppMessage(() => ({ title: SHARE_TITLE, path: sharePath('/pages/home/index') }))
+onShareTimeline(() => ({ title: SHARE_TITLE }))
 
 const toBooking = () => switchTab('booking')
 const toWorks = (category?: StyleCategory) => switchTab('works', { category })

@@ -1,7 +1,7 @@
 <template>
   <view>
-    <!-- 自定义导航：只有一个返回按钮，和右上角胶囊垂直居中对齐 -->
-    <view class="back" :style="backStyle" hover-class="back--hover" @tap="goBack">
+    <!-- 自定义导航：只有一个返回按钮，和右上角胶囊垂直居中对齐。朋友圈单页模式有微信自己的导航栏，不能返回，不显示 -->
+    <view v-if="!singlePage" class="back" :style="backStyle" hover-class="back--hover" @tap="goBack">
       <image class="back__icon" src="/static/icons/back.svg" />
     </view>
 
@@ -63,10 +63,10 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
+import { onLoad, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import { api, errorText, type ID, type Service } from '@/api'
 import { formatPrice } from '@/utils/money'
-import { SHOP_NAME, shareImage, sharePath } from '@/utils/share'
+import { isSinglePage, SHOP_NAME, shareImage, sharePath, shareQuery } from '@/utils/share'
 import { switchTab } from '@/utils/tab'
 import AppButton from '@/components/AppButton.vue'
 import ArchImage from '@/components/ArchImage.vue'
@@ -85,6 +85,7 @@ let serviceId: ID = ''
 
 // ---------- 返回按钮位置 ----------
 
+const singlePage = isSinglePage()
 const menu = uni.getMenuButtonBoundingClientRect()
 const BACK_SIZE = 32 // px，与原型一致
 const backStyle = {
@@ -119,14 +120,20 @@ onLoad(query => {
 })
 
 // 价格写在标题里：价格透明本来就是卖点。还没加载出来时退回门店名
-onShareAppMessage(() => {
+function shareTitle() {
   const s = service.value
-  return {
-    title: s ? `${s.name}｜${formatPrice(s.price, { from: s.priceFrom })}，约 ${s.durationMin} 分钟` : SHOP_NAME,
-    path: sharePath('/pages/service/detail', { id: serviceId }),
-    imageUrl: shareImage(s?.cover),
-  }
-})
+  return s ? `${s.name}｜${formatPrice(s.price, { from: s.priceFrom })}，约 ${s.durationMin} 分钟` : SHOP_NAME
+}
+onShareAppMessage(() => ({
+  title: shareTitle(),
+  path: sharePath('/pages/service/detail', { id: serviceId }),
+  imageUrl: shareImage(service.value?.cover),
+}))
+onShareTimeline(() => ({
+  title: shareTitle(),
+  query: shareQuery({ id: serviceId }),
+  imageUrl: shareImage(service.value?.cover),
+}))
 
 function onSwipe(e: { detail: { current: number } }) {
   imageIndex.value = e.detail.current

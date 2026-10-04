@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { onLaunch } from '@dcloudio/uni-app'
 import { api } from '@/api'
+import { isSinglePage } from '@/utils/share'
 
 // 启动时先登录。页面不用等它：请求发出前会自己等这次登录；这里失败了，第一次请求时会再登录一次
+// 朋友圈单页模式没有登录态，不登录
 onLaunch(() => {
+  if (isSinglePage()) return
   api.login().catch(() => {})
 })
 </script>

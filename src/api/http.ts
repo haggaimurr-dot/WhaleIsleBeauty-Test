@@ -6,6 +6,7 @@
  * 部署配置（环境 ID、服务名、传输方式）在 config.ts。换成自己的域名时把 TRANSPORT 改成 'https'，登录会自动走 code 换 token。
  * 云托管的 callContainer 需要基础库 2.23.0 以上，在小程序后台把最低基础库设到这个版本。
  */
+import { isSinglePage } from '@/utils/share'
 import { API_PREFIX, BASE_URL, CLOUD_ENV, CLOUD_SERVICE, TRANSPORT } from './config'
 import type { Api } from './contract'
 import { ApiError, type Booking, type ErrorCode, type ID, type Me, type WxPayParams } from './types'
@@ -113,8 +114,15 @@ function doLogin(): Promise<Me> {
  * 需要登录的请求：
  * - 这次启动还没登录过（或启动时的登录还没回来）就先等登录
  * - 返回 401 时重新登录，再重试一次原来的请求；还是 401 就把 UNAUTHORIZED 抛给页面
+ * - 朋友圈单页模式不登录
  */
 async function request<T>(method: Method, path: string, data?: unknown): Promise<T> {
+  // 朋友圈单页模式没有登录态：直接发，后端只开放了公开资料，其余接口会报 UNAUTHORIZED
+  if (isSinglePage()) {
+    const res = await send<T>(method, path, data)
+    if (res.ok) return res.data
+    throw res.error
+  }
   if (loggingIn) await loggingIn.catch(() => {})
   if (!loginGen) await doLogin()
 

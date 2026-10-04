@@ -66,12 +66,12 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
+import { onLoad, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
 import {
   api, errorText, CATEGORY_LABEL,
   type Artist, type ID, type StyleCategory, type Work,
 } from '@/api'
-import { SHOP_NAME, shareImage, sharePath } from '@/utils/share'
+import { SHOP_NAME, shareImage, sharePath, shareQuery } from '@/utils/share'
 import { switchTab, takeTabParams } from '@/utils/tab'
 import { workImageHeight } from '@/utils/work'
 import AppButton from '@/components/AppButton.vue'
@@ -186,21 +186,30 @@ function closeSheet(immediate = false) {
   tabBarTimer = setTimeout(() => uni.showTabBar({ animation: false, fail: noop }), immediate ? 0 : 300)
 }
 
-// 弹层开着就分享这件作品，否则分享当前分类
-onShareAppMessage(() => {
+// 弹层开着就分享这件作品，否则分享当前分类。发给朋友和朋友圈内容一样，朋友圈只带 query
+function shareContent() {
   const w = sheetOn.value ? current.value : undefined
   if (w) {
     return {
       title: `${w.title}｜化妆师 ${artistName(w.artistId)}`,
-      path: sharePath('/pages/works/index', { category: w.category, workId: w.id }),
+      query: { category: w.category, workId: w.id },
       imageUrl: shareImage(w.image),
     }
   }
   const c = category.value
   return {
     title: c ? `${SHOP_NAME}的${CATEGORY_LABEL[c]}妆作品` : `${SHOP_NAME}的作品，都是来过的客人`,
-    path: sharePath('/pages/works/index', { category: c }),
+    query: { category: c },
   }
+}
+
+onShareAppMessage(() => {
+  const { query, ...rest } = shareContent()
+  return { ...rest, path: sharePath('/pages/works/index', query) }
+})
+onShareTimeline(() => {
+  const { query, ...rest } = shareContent()
+  return { ...rest, query: shareQuery(query) }
 })
 
 function bookSame() {

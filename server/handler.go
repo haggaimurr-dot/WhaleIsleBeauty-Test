@@ -74,6 +74,8 @@ func (a *App) withUser(next http.HandlerFunc) http.HandlerFunc {
 func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
 	h := func(pattern string, f http.HandlerFunc) { mux.HandleFunc(pattern, a.withUser(f)) }
+	// pub 公开资料，不认人：朋友圈打开的“单页模式”没有登录态，网关不带 X-WX-OPENID
+	pub := mux.HandleFunc
 
 	// 云托管的健康检查
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
@@ -116,25 +118,25 @@ func (a *App) Routes() http.Handler {
 		reply(w, r, p, err)
 	})
 
-	// ---------- 基础资料 ----------
-	h("GET /v1/artists", func(w http.ResponseWriter, r *http.Request) {
+	// ---------- 基础资料（公开） ----------
+	pub("GET /v1/artists", func(w http.ResponseWriter, r *http.Request) {
 		v, err := a.Artists(r.Context())
 		reply(w, r, v, err)
 	})
-	h("GET /v1/services", func(w http.ResponseWriter, r *http.Request) {
+	pub("GET /v1/services", func(w http.ResponseWriter, r *http.Request) {
 		v, err := a.Services(r.Context())
 		reply(w, r, v, err)
 	})
-	h("GET /v1/services/{id}", func(w http.ResponseWriter, r *http.Request) {
+	pub("GET /v1/services/{id}", func(w http.ResponseWriter, r *http.Request) {
 		v, err := a.Service(r.Context(), r.PathValue("id"))
 		reply(w, r, v, err)
 	})
-	h("GET /v1/works", func(w http.ResponseWriter, r *http.Request) {
+	pub("GET /v1/works", func(w http.ResponseWriter, r *http.Request) {
 		v, err := a.Works(r.Context(), r.URL.Query().Get("category"))
 		reply(w, r, v, err)
 	})
-	h("GET /v1/dates", func(w http.ResponseWriter, r *http.Request) { reply(w, r, a.datesFrom(1, bookableDays), nil) })
-	h("GET /v1/shop", func(w http.ResponseWriter, r *http.Request) {
+	pub("GET /v1/dates", func(w http.ResponseWriter, r *http.Request) { reply(w, r, a.datesFrom(1, bookableDays), nil) })
+	pub("GET /v1/shop", func(w http.ResponseWriter, r *http.Request) {
 		v, err := a.Shop(r.Context())
 		reply(w, r, v, err)
 	})

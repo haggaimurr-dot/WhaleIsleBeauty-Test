@@ -59,9 +59,9 @@ afterEach(() => {
 })
 
 describe('云托管（callContainer）', () => {
-  function setup() {
+  function setup(scene = 1001) {
     const srv = fakeServer(false)
-    const { uni } = stubUni()
+    const { uni } = stubUni({ getLaunchOptionsSync: () => ({ scene }) })
     const cloud = {
       init: vi.fn(),
       callContainer: vi.fn((o: { path: string; method: string; header: Header; data: unknown; config: { env: string }; success: (r: unknown) => void }) =>
@@ -92,6 +92,17 @@ describe('云托管（callContainer）', () => {
     srv.forced = [['UNAUTHORIZED', 401]]
     expect(await api.getMe()).toEqual({ path: '/v1/me' })
     expect(srv.logins()).toBe(2)
+  })
+
+  it('朋友圈单页模式（1154）不登录，401 直接抛 UNAUTHORIZED，不重试', async () => {
+    const { srv, cloud } = setup(1154)
+    const api = await loadHttp('cloud')
+    expect(await api.getService('s1')).toEqual({ path: '/v1/services/s1' })
+    expect(await api.listWorks('daily')).toEqual({ path: '/v1/works?category=daily' })
+    srv.forced = [['UNAUTHORIZED', 401]]
+    await expect(api.listMyBookings('upcoming')).rejects.toSatisfy(e => code(e) === 'UNAUTHORIZED')
+    expect(srv.logins()).toBe(0)
+    expect(cloud.callContainer).toHaveBeenCalledTimes(3)
   })
 
   it('调用失败报 NETWORK；没有 wx.cloud 也报 NETWORK', async () => {

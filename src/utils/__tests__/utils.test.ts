@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { addMinutes, datesFromToday, dayLabel, formatClock, formatDateCN, upcomingDates } from '@/utils/date'
 import { centsToYuanInput, formatPrice, parseYuan } from '@/utils/money'
-import { shareImage, sharePath } from '@/utils/share'
+import { isSinglePage, shareImage, sharePath, shareQuery } from '@/utils/share'
 import { requestSubscribe, SUBSCRIBE_TEMPLATES } from '@/utils/subscribe'
 import { workImageHeight } from '@/utils/work'
 import { useMockClock } from '@/test/helpers'
@@ -54,6 +54,21 @@ describe('money', () => {
 })
 
 describe('share', () => {
+  it('朋友圈 query：不带路径，去掉空参数', () => {
+    expect(shareQuery({ category: 'bridal', workId: 'w3' })).toBe('category=bridal&workId=w3')
+    expect(shareQuery({ category: undefined })).toBe('')
+    expect(shareQuery({ id: 'a b' })).toBe('id=a%20b')
+  })
+
+  it('场景值 1154 是朋友圈单页模式；拿不到启动参数当普通模式', () => {
+    vi.stubGlobal('uni', { getLaunchOptionsSync: () => ({ scene: 1154 }) })
+    expect(isSinglePage()).toBe(true)
+    vi.stubGlobal('uni', { getLaunchOptionsSync: () => ({ scene: 1007 }) })
+    expect(isSinglePage()).toBe(false)
+    vi.stubGlobal('uni', {})
+    expect(isSinglePage()).toBe(false)
+  })
+
   it('路径跳过空参数并编码', () => {
     expect(sharePath('/pages/works/index', { category: 'bridal', workId: 'w3' })).toBe('/pages/works/index?category=bridal&workId=w3')
     expect(sharePath('/pages/works/index', { category: undefined, workId: '' })).toBe('/pages/works/index')

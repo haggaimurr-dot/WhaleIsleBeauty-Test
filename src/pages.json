@@ -3,7 +3,7 @@
 	"pages": [
 		{ "path": "pages/home/index", "style": { "disableScroll": true, "navigationBarTitleText": "" } },
 		{ "path": "pages/works/index", "style": { "disableScroll": true, "navigationBarTitleText": "" } },
-		{ "path": "pages/service/detail", "style": { "disableScroll": true, "navigationStyle": "custom" } },
+		{ "path": "pages/service/detail", "style": { "disableScroll": true, "navigationStyle": "custom", "navigationBarTitleText": "项目详情" } },
 		{ "path": "pages/booking/index", "style": { "disableScroll": true, "navigationBarTitleText": "预约" } },
 		{ "path": "pages/booking/success", "style": { "disableScroll": true, "navigationBarTitleText": "" } },
 		{ "path": "pages/booking/reschedule", "style": { "disableScroll": true, "navigationBarTitleText": "改期" } },
