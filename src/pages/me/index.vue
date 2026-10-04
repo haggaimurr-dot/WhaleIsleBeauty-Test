@@ -23,7 +23,18 @@
     <template v-else-if="status === 'ok'">
       <!-- 即将到来 -->
       <template v-if="tab === 'upcoming'">
-        <view v-if="!upcoming.length" class="panel">
+        <!-- 来过的客人：直接照上次的再约 -->
+        <view v-if="!upcoming.length && lastDone" class="panel">
+          <view class="panel__text">还没有要来的预约。</view>
+          <view class="panel__text panel__text--last">
+            上次是 {{ formatMonthDay(lastDone.date) }} 找{{ lastDone.artistName }}做的{{ lastDone.serviceName }}，照这个再约一次？
+          </view>
+          <view class="panel__acts">
+            <AppButton variant="ghost" @click="switchTab('booking')">看看别的</AppButton>
+            <AppButton @click="bookAgain(lastDone)">再约一次</AppButton>
+          </view>
+        </view>
+        <view v-else-if="!upcoming.length" class="panel">
           <view class="panel__text">还没有要来的预约。</view>
           <view class="panel__text panel__text--last">挑一个喜欢的妆，约个时间吧。</view>
           <AppButton @click="switchTab('booking')">去预约</AppButton>
@@ -261,7 +272,10 @@ async function continuePay(b: Booking) {
 
 const reschedule = (b: Booking) => uni.navigateTo({ url: `/pages/booking/reschedule?rescheduleId=${b.id}` })
 
-const bookAgain = (b: Booking) => switchTab('booking', { serviceId: b.serviceId, artistId: b.artistId })
+const bookAgain = (b: Booking) => switchTab('booking', { serviceId: b.serviceId, artistId: b.artistId, again: true })
+
+/** 最近一次真正到店做完的预约（past 按时间倒序），取消的不算 */
+const lastDone = computed(() => past.value.find(b => b.status === 'completed'))
 
 function navigate() {
   const s = shop.value
@@ -477,6 +491,12 @@ const openCatalog = () => uni.navigateTo({ url: '/pages-owner/catalog/index' })
     &--last {
       margin-bottom: 32rpx;
     }
+  }
+
+  &__acts {
+    display: flex;
+    justify-content: center;
+    gap: 16rpx;
   }
 }
 
