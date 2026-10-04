@@ -28,6 +28,10 @@
           {{ booking.status === 'pending_payment' ? '支付确认中' : formatPrice(booking.deposit) }}
         </view>
       </view>
+
+      <AppButton v-if="booking && status === 'ok'" class="done__cal" variant="ghost" size="sm" @click="addToCalendar(booking, shop)">
+        添加到手机日历
+      </AppButton>
     </view>
 
     <template #footer>
@@ -43,6 +47,7 @@
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { api, errorText, type Booking, type ID, type Shop } from '@/api'
+import { addToCalendar } from '@/utils/calendar'
 import { formatDateCN } from '@/utils/date'
 import { formatPrice } from '@/utils/money'
 import { switchTab } from '@/utils/tab'
@@ -108,6 +113,10 @@ onLoad(query => {
     &--last {
       margin-bottom: 44rpx;
     }
+  }
+
+  &__cal {
+    margin-top: 32rpx;
   }
 
 }

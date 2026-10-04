@@ -34,6 +34,7 @@
             <view>
               <view class="bcard__when">{{ formatDateCN(b.date) }}</view>
               <view class="bcard__sub">{{ b.time }} 开始，约 {{ b.durationMin }} 分钟</view>
+              <view v-if="!isUnpaid(b)" class="bcard__cal" hover-class="bcard__cal--hover" @tap="addToCalendar(b, shop)">添加到手机日历</view>
             </view>
             <StatusBadge :status="b.status" />
           </view>
@@ -122,6 +123,7 @@ import {
   api, payDeposit, errorText, ApiError,
   type Artist, type Booking, type ID, type Me, type Service, type Shop,
 } from '@/api'
+import { addToCalendar } from '@/utils/calendar'
 import { formatClock, formatDateCN, formatMonthDay } from '@/utils/date'
 import { formatPrice } from '@/utils/money'
 import { requestSubscribe } from '@/utils/subscribe'
@@ -355,6 +357,20 @@ const openCatalog = () => uni.navigateTo({ url: '/pages-owner/catalog/index' })
     margin-top: 8rpx;
     font-size: $fs-caption + 2rpx;
     color: $mute;
+  }
+
+  &__cal {
+    display: inline-block;
+    margin-top: 12rpx;
+    padding: 6rpx 20rpx;
+    border: 2rpx solid $hair;
+    border-radius: $r-pill;
+    font-size: $fs-caption;
+    color: $mocha;
+
+    &--hover {
+      background: $milk;
+    }
   }
 
   &__info {

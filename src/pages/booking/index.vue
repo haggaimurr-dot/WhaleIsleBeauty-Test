@@ -9,6 +9,7 @@
         </view>
         <text class="chosen__change">换一个</text>
       </view>
+      <view v-if="service && showAgainHint" class="hint hint--head">照你上次约的选好了项目和化妆师，挑个时间就行</view>
     </template>
 
     <view v-if="status === 'error'" class="panel">
@@ -138,13 +139,28 @@ const summary = computed(() => {
 /** 从作品页“预约同款”、详情页“预约这个妆”带过来的预选 */
 let pendingParams: TabParams['booking']
 
+/** “再约一次”预选的组合；客人换了项目或化妆师，提示就收起 */
+const again = ref<{ serviceId: ID; artistId: ID }>()
+const showAgainHint = computed(() =>
+  !!again.value && again.value.serviceId === serviceId.value && again.value.artistId === artistId.value)
+
 function applyParams() {
   const p = pendingParams
   if (!p || status.value !== 'ok') return
   pendingParams = undefined
-  if (p.serviceId && services.value.some(s => s.id === p.serviceId)) serviceId.value = p.serviceId
-  if (p.artistId && artists.value.some(a => a.id === p.artistId)) artistId.value = p.artistId
+  const serviceOk = !p.serviceId || services.value.some(s => s.id === p.serviceId)
+  const artistOk = !p.artistId || artists.value.some(a => a.id === p.artistId)
+  if (p.serviceId && serviceOk) serviceId.value = p.serviceId
+  if (p.artistId && artistOk) artistId.value = p.artistId
   time.value = undefined
+  again.value = p.again && p.serviceId && p.artistId && serviceOk && artistOk
+    ? { serviceId: p.serviceId, artistId: p.artistId }
+    : undefined
+  // 下架的项目、不在了的化妆师选不上，说一声，免得客人以为还是原来那个
+  const prefix = p.again ? '上次的' : '这个'
+  if (!serviceOk && !artistOk) toast(`${prefix}项目和化妆师现在都约不了，换一个吧`)
+  else if (!serviceOk) toast(`${prefix}项目暂时不接预约了，换一个吧`)
+  else if (!artistOk) toast(p.again ? '上次的化妆师现在不接预约了，看看别的化妆师吧' : '这位化妆师现在不接预约了，看看别的化妆师吧')
 }
 
 async function load() {
@@ -245,6 +261,7 @@ async function resume(id: ID) {
 
 function resetForm() {
   time.value = undefined
+  again.value = undefined
   occasion.value = undefined
   skinType.value = profileSkin.value
   note.value = ''
@@ -308,6 +325,10 @@ function resetForm() {
   margin: -12rpx $page-x 20rpx;
   font-size: $fs-caption;
   color: $mute;
+
+  &--head {
+    margin: 8rpx $page-x 0;
+  }
 }
 
 .chips {
