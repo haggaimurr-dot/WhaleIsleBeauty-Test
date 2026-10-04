@@ -93,16 +93,46 @@
         </view>
 
         <view v-for="b in past" :key="b.id" class="past">
-          <ArchImage class="past__thumb" shape="rect" :src="serviceCover(b.serviceId)" />
-          <view class="past__text">
-            <view class="past__service">{{ b.serviceName }}</view>
-            {{ formatMonthDay(b.date) }}　化妆师 {{ b.artistName }}
-            <StatusBadge v-if="b.status === 'cancelled'" class="past__badge" :status="b.status" />
-            <view v-if="cancelNote(b)" class="past__why" :class="{ 'past__why--refund': b.cancelReason === 'not_confirmed' || b.cancelReason === 'no_show' }">
-              {{ cancelNote(b) }}
+          <view class="past__row">
+            <ArchImage class="past__thumb" shape="rect" :src="serviceCover(b.serviceId)" />
+            <view class="past__text">
+              <view class="past__service">{{ b.serviceName }}</view>
+              {{ formatMonthDay(b.date) }}　化妆师 {{ b.artistName }}
+              <StatusBadge v-if="b.status === 'cancelled'" class="past__badge" :status="b.status" />
+              <view v-if="cancelNote(b)" class="past__why" :class="{ 'past__why--refund': !b.refund && b.cancelReason !== 'pay_timeout' }">
+                {{ cancelNote(b) }}
+              </view>
+            </view>
+            <AppButton variant="ghost" size="sm" @click="bookAgain(b)">再约一次</AppButton>
+          </view>
+
+          <!-- 定金退款进度：取消 → 退款中 → 已退回 -->
+          <view v-if="b.refund" class="refund">
+            <view class="refund__title">
+              定金 {{ formatPrice(b.refund.amount) }} {{ b.refund.status === 'succeeded' ? '已退回' : '退款中' }}
+            </view>
+            <view class="refund__steps">
+              <view class="refund__step refund__step--done">
+                <view class="refund__dot" />
+                <view class="refund__label">已取消</view>
+                <view class="refund__time">{{ stampText(b.refund.createdAt) }}</view>
+              </view>
+              <view class="refund__line refund__line--done" />
+              <view class="refund__step refund__step--done">
+                <view class="refund__dot" />
+                <view class="refund__label">退款中</view>
+              </view>
+              <view class="refund__line" :class="{ 'refund__line--done': b.refund.status === 'succeeded' }" />
+              <view class="refund__step" :class="{ 'refund__step--done': b.refund.status === 'succeeded' }">
+                <view class="refund__dot" />
+                <view class="refund__label">已退回</view>
+                <view class="refund__time">{{ b.refund.succeededAt ? stampText(b.refund.succeededAt) : '' }}</view>
+              </view>
+            </view>
+            <view v-if="b.refund.status === 'processing'" class="refund__hint">
+              原路退回付款账户：微信零钱一般几分钟到账，银行卡要 1–3 个工作日。
             </view>
           </view>
-          <AppButton variant="ghost" size="sm" @click="bookAgain(b)">再约一次</AppButton>
         </view>
       </template>
     </template>
@@ -135,7 +165,7 @@ import {
   type Artist, type Booking, type ID, type Me, type Service, type Shop,
 } from '@/api'
 import { addToCalendar } from '@/utils/calendar'
-import { formatClock, formatDateCN, formatMonthDay } from '@/utils/date'
+import { formatClock, formatDateCN, formatMonthDay, toDateStr } from '@/utils/date'
 import { formatPrice } from '@/utils/money'
 import { requestSubscribe } from '@/utils/subscribe'
 import { switchTab } from '@/utils/tab'
@@ -170,13 +200,18 @@ const visitText = computed(() => {
 
 const isUnpaid = (b: Booking) => b.status === 'pending_payment'
 
-/** 自动取消、店里记了没来的说明；客人自己取消（含店里代取消）的不用再解释 */
+/** 自动取消、店里记了没来的说明；客人自己取消（含店里代取消）的不用再解释。定金的去向由下面的退款进度说明 */
 function cancelNote(b: Booking) {
-  if (b.cancelReason === 'not_confirmed') return `店里没来得及确认，定金 ${formatPrice(b.deposit)} 已原路退回`
   if (b.cancelReason === 'pay_timeout') return '没有付定金，时段已经放出去了'
-  if (b.cancelReason === 'no_show') return `这次没等到你，定金 ${formatPrice(b.deposit)} 已原路退回`
+  // 没有退款进度的是老数据，照旧在这里说一句
+  const money = b.refund ? '' : `，定金 ${formatPrice(b.deposit)} 已原路退回`
+  if (b.cancelReason === 'not_confirmed') return `店里没来得及确认${money || '，自动取消了'}`
+  if (b.cancelReason === 'no_show') return `这次没等到你${money}`
   return ''
 }
+
+/** 退款进度里的时间：'10月4日 14:20' */
+const stampText = (ts: string) => `${formatMonthDay(toDateStr(new Date(ts)))} ${formatClock(ts)}`
 
 /** 待付定金的有截止时间，放在最前面；其余保持接口给的时间顺序 */
 const upcomingSorted = computed(() => [
@@ -236,7 +271,7 @@ function cancel(b: Booking) {
       cancellingId.value = b.id
       try {
         await api.cancelBooking(b.id)
-        toast(unpaid ? '已取消预约' : `已取消预约，定金 ${formatPrice(b.deposit)} 将原路退回`)
+        toast(unpaid ? '已取消预约' : `已取消预约，定金 ${formatPrice(b.deposit)} 原路退回，进度在「已完成」里看`)
       } catch (e) {
         if (e instanceof ApiError && e.code === 'CANCEL_TOO_LATE') {
           uni.showModal({ title: '没法在线取消了', content: errorText(e), confirmText: '联系门店', cancelText: '知道了',
@@ -433,13 +468,16 @@ const openCatalog = () => uni.navigateTo({ url: '/pages-owner/catalog/index' })
 }
 
 .past {
-  display: flex;
-  align-items: center;
-  gap: $gap;
   margin: 0 $page-x 20rpx;
   padding: $gap;
   border-radius: $r-card;
   background: $card;
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: $gap;
+  }
 
   &__thumb {
     flex: none;
@@ -473,6 +511,81 @@ const openCatalog = () => uni.navigateTo({ url: '/pages-owner/catalog/index' })
     &--refund {
       color: $sage-ink;
     }
+  }
+}
+
+// 退款属于安全感信息，整块用鼠尾草绿
+.refund {
+  margin-top: 20rpx;
+  padding: 20rpx 24rpx 24rpx;
+  border-radius: $r-small;
+  background: $sage-bg;
+  color: $sage-ink;
+
+  &__title {
+    font-size: $fs-small;
+    font-weight: 600;
+  }
+
+  &__steps {
+    display: flex;
+    align-items: flex-start;
+    margin-top: 20rpx;
+  }
+
+  &__step {
+    flex: none;
+    width: 168rpx;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  &__dot {
+    box-sizing: border-box;
+    width: 20rpx;
+    height: 20rpx;
+    border-radius: 50%;
+    border: 3rpx solid $sage;
+    background: $card;
+  }
+
+  &__step--done .refund__dot {
+    background: $sage;
+  }
+
+  &__label {
+    margin-top: 8rpx;
+    font-size: $fs-caption;
+    line-height: 1.4;
+  }
+
+  &__step:not(.refund__step--done) .refund__label {
+    color: $mute;
+  }
+
+  &__time {
+    font-size: $fs-caption - 2rpx;
+    line-height: 1.4;
+    color: $mute;
+  }
+
+  // 线和圆点的中心对齐
+  &__line {
+    flex: 1;
+    margin: 9rpx -64rpx 0;
+    border-top: 2rpx dashed $sage;
+
+    &--done {
+      border-top-style: solid;
+    }
+  }
+
+  &__hint {
+    margin-top: 16rpx;
+    font-size: $fs-caption;
+    line-height: 1.6;
   }
 }
 

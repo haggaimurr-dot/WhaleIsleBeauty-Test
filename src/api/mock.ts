@@ -141,6 +141,10 @@ const bookings: Booking[] = (
 const blocks = new Set<string>()
 /** 付过定金的预约。Booking 上没有这个字段，经营统计要用：没付就取消的不算 */
 const paidIds = new Set<ID>(bookings.map(b => b.id))
+/** 付过定金后取消的预约：发起退款的时间（毫秒） */
+const refunds = new Map<ID, number>()
+/** 假退款多久到账。真实的微信零钱一般几分钟，演示时能看到“退款中”就行 */
+const REFUND_MS = 2 * 60 * 1000
 let seq = 100
 
 /**
@@ -159,10 +163,17 @@ function autoCancel() {
     } else if (b.status === 'pending_confirm' && isPast(b.date, b.time)) {
       b.status = 'cancelled'
       b.cancelReason = 'not_confirmed'
+      // 后端的定时任务在开始时间就会取消，退款也从那时算
+      refund(b, Math.min(now, parse(b.date, b.time).getTime()))
     } else if (b.status === 'confirmed' && parse(b.date, b.time).getTime() + b.durationMin * 60_000 <= now) {
       b.status = 'completed'
     }
   }
+}
+
+/** 付过定金的原路退回，没付过的不用退 */
+function refund(b: Booking, at = Date.now()) {
+  if (paidIds.has(b.id) && !refunds.has(b.id)) refunds.set(b.id, at)
 }
 
 function getBookingOrThrow(id: ID) {
@@ -212,6 +223,14 @@ function isAvailable(artistId: ID, date: DateStr, time: TimeStr, ignoreBookingId
 function out(b: Booking): Booking {
   const c = clone(b)
   c.canCancel = c.status === 'pending_payment' || (ACTIVE.includes(c.status) && hoursUntil(c.date, c.time) >= 24)
+  const at = refunds.get(c.id)
+  if (at !== undefined) {
+    const done = at + REFUND_MS <= Date.now()
+    c.refund = {
+      amount: c.deposit, status: done ? 'succeeded' : 'processing', createdAt: toTimestamp(new Date(at)),
+      ...(done && { succeededAt: toTimestamp(new Date(at + REFUND_MS)) }),
+    }
+  }
   return c
 }
 
@@ -477,6 +496,7 @@ export const mockApi: Api = {
     b.status = 'cancelled'
     b.cancelReason = 'customer'
     delete b.payDeadline
+    refund(b)
     if (paid) notifyOwner('cancelled', b)
     return out(b)
   },
@@ -577,6 +597,7 @@ export const mockApi: Api = {
     b.status = 'cancelled'
     b.cancelReason = 'customer'
     delete b.payDeadline
+    refund(b)
     return out(b)
   },
 
@@ -613,6 +634,7 @@ export const mockApi: Api = {
     // 定金同样原路退回
     b.status = 'cancelled'
     b.cancelReason = 'no_show'
+    refund(b)
     return out(b)
   },
 

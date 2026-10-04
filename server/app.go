@@ -148,6 +148,7 @@ func (a *App) out(b *BookingRow) Booking {
 	if b.Status == StatusPendingPayment && b.PayDeadline != nil {
 		o.PayDeadline = ts(*b.PayDeadline)
 	}
+	o.Refund = a.refundView(b)
 	return o
 }
 
@@ -179,17 +180,41 @@ func (a *App) Sweep(ctx context.Context) error {
 	return nil
 }
 
-// refund 定金原路退回。假支付模式下只记下退款时间
+// fakeRefundDelay 假支付模式下退款多久“到账”。真实的微信零钱一般几分钟，留一会儿让客人能看到“退款中”
+const fakeRefundDelay = 2 * time.Minute
+
+// refund 定金原路退回。假支付模式下不调微信，只记下发起时间和预计到账时间
 func (a *App) refund(b *BookingRow, now time.Time) {
-	if b.PaidAt == nil || b.RefundedAt != nil {
+	if b.PaidAt == nil || b.RefundRequestedAt != nil || b.RefundedAt != nil {
 		return
 	}
+	b.RefundRequestedAt = &now
 	if !a.fakePay {
-		// TODO: 接微信支付后在这里调退款接口
+		// TODO: 接微信支付后在这里调退款接口，到账时间由退款回调写入 RefundedAt
 		log.Printf("refund needed: booking=%s deposit=%d", b.ID, b.Deposit)
 		return
 	}
-	b.RefundedAt = &now
+	done := now.Add(fakeRefundDelay)
+	b.RefundedAt = &done
+}
+
+// refundView 退款进度：RefundedAt 到了才算到账
+func (a *App) refundView(b *BookingRow) *Refund {
+	if b.Status != StatusCancelled || b.PaidAt == nil {
+		return nil
+	}
+	start := b.RefundRequestedAt
+	if start == nil {
+		start = b.RefundedAt // 加 refund_requested_at 之前退的，只记了到账时间
+	}
+	if start == nil {
+		return nil
+	}
+	r := &Refund{Amount: b.Deposit, Status: "processing", CreatedAt: ts(*start)}
+	if b.RefundedAt != nil && !b.RefundedAt.After(a.now()) {
+		r.Status, r.SucceededAt = "succeeded", ts(*b.RefundedAt)
+	}
+	return r
 }
 
 // ---------- 用户 ----------

@@ -42,7 +42,7 @@ describe('店主替客人取消', () => {
     await expect(api.cancelBooking(b.id)).rejects.toSatisfy(e => code(e) === 'CANCEL_TOO_LATE')
 
     const out = await api.ownerCancelBooking(b.id)
-    expect(out).toMatchObject({ status: 'cancelled', cancelReason: 'customer' })
+    expect(out).toMatchObject({ status: 'cancelled', cancelReason: 'customer', refund: { status: 'processing' } })
     expect(cellAt(await api.getDaySchedule(date), 'a1', time).state).toBe('free')
     expect(ownerNotices()).toHaveLength(sent)
     await expect(api.ownerCancelBooking(b.id)).rejects.toSatisfy(e => code(e) === 'INVALID_STATE')
@@ -138,7 +138,7 @@ describe('客人没来', () => {
     const before = await api.getDaySchedule(date)
     expect(cellAt(before, 'a1', time).booking).toMatchObject({ status: 'confirmed', canMarkNoShow: true, canChange: false })
 
-    expect(await api.markNoShow(b.id)).toMatchObject({ status: 'cancelled', cancelReason: 'no_show' })
+    expect(await api.markNoShow(b.id)).toMatchObject({ status: 'cancelled', cancelReason: 'no_show', refund: { status: 'processing' } })
     const after = await api.getDaySchedule(date)
     expect(cellAt(after, 'a1', time)).toMatchObject({ state: 'booked', booking: { status: 'cancelled', canMarkNoShow: false } })
     expect(after.stats.total).toBe(before.stats.total - 1)

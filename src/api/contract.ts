@@ -80,7 +80,10 @@ export interface Api {
    * 已超过 payDeadline 或状态不是 pending_payment 时返回 INVALID_STATE
    */
   resumePayment(id: ID): Promise<CreateBookingResp>
-  /** POST /bookings/:id/cancel  距离开始不足 24 小时返回 CANCEL_TOO_LATE（pending_payment 不受限制） */
+  /**
+   * POST /bookings/:id/cancel  距离开始不足 24 小时返回 CANCEL_TOO_LATE（pending_payment 不受限制）。
+   * 付过定金的同时发起退款，返回的 booking 带 refund；之后退款进度在 listMyBookings('past') 里看
+   */
   cancelBooking(id: ID): Promise<Booking>
   /** POST /bookings/:id/reschedule  同样受 24 小时规则限制，改期后回到 pending_confirm（还没付定金的仍是 pending_payment）。到店提醒按新时间发 */
   rescheduleBooking(id: ID, req: RescheduleReq): Promise<Booking>

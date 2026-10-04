@@ -202,17 +202,17 @@ func (s *mysqlStore) CountCompleted(ctx context.Context, userID string) (int, er
 // ---------- 预约 ----------
 
 const bookingCols = `id, user_id, service_id, service_name, artist_id, artist_name, date, time, start_at, end_at,
-  duration_min, price, deposit, status, occasion, skin_type, note, created_at, pay_deadline, paid_at, refunded_at, cancel_reason`
+  duration_min, price, deposit, status, occasion, skin_type, note, created_at, pay_deadline, paid_at, refund_requested_at, refunded_at, cancel_reason`
 
 func scanBooking(sc interface{ Scan(...any) error }) (*BookingRow, error) {
 	var b BookingRow
-	var deadline, paid, refunded sql.NullTime
+	var deadline, paid, refundReq, refunded sql.NullTime
 	if err := sc.Scan(&b.ID, &b.UserID, &b.ServiceID, &b.ServiceName, &b.ArtistID, &b.ArtistName, &b.Date, &b.Time,
 		&b.StartAt, &b.EndAt, &b.DurationMin, &b.Price, &b.Deposit, &b.Status, &b.Occasion, &b.SkinType, &b.Note,
-		&b.CreatedAt, &deadline, &paid, &refunded, &b.CancelReason); err != nil {
+		&b.CreatedAt, &deadline, &paid, &refundReq, &refunded, &b.CancelReason); err != nil {
 		return nil, err
 	}
-	b.PayDeadline, b.PaidAt, b.RefundedAt = timePtr(deadline), timePtr(paid), timePtr(refunded)
+	b.PayDeadline, b.PaidAt, b.RefundRequestedAt, b.RefundedAt = timePtr(deadline), timePtr(paid), timePtr(refundReq), timePtr(refunded)
 	return &b, nil
 }
 
@@ -235,10 +235,10 @@ func (s *mysqlStore) queryBookings(ctx context.Context, where string, args ...an
 
 func (s *mysqlStore) InsertBooking(ctx context.Context, b *BookingRow) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO bookings (`+bookingCols+`)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		b.ID, b.UserID, b.ServiceID, b.ServiceName, b.ArtistID, b.ArtistName, b.Date, b.Time,
 		b.StartAt.UTC(), b.EndAt.UTC(), b.DurationMin, b.Price, b.Deposit, b.Status, b.Occasion, b.SkinType, b.Note,
-		b.CreatedAt.UTC(), nullTime(b.PayDeadline), nullTime(b.PaidAt), nullTime(b.RefundedAt), b.CancelReason)
+		b.CreatedAt.UTC(), nullTime(b.PayDeadline), nullTime(b.PaidAt), nullTime(b.RefundRequestedAt), nullTime(b.RefundedAt), b.CancelReason)
 	if isDuplicate(err) {
 		return ErrSlotTaken
 	}
@@ -256,10 +256,10 @@ func (s *mysqlStore) Booking(ctx context.Context, id string) (*BookingRow, error
 func (s *mysqlStore) UpdateBooking(ctx context.Context, b *BookingRow, from string) error {
 	res, err := s.db.ExecContext(ctx, `UPDATE bookings SET
 		artist_id = ?, artist_name = ?, date = ?, time = ?, start_at = ?, end_at = ?, status = ?,
-		pay_deadline = ?, paid_at = ?, refunded_at = ?, cancel_reason = ?
+		pay_deadline = ?, paid_at = ?, refund_requested_at = ?, refunded_at = ?, cancel_reason = ?
 		WHERE id = ? AND status = ?`,
 		b.ArtistID, b.ArtistName, b.Date, b.Time, b.StartAt.UTC(), b.EndAt.UTC(), b.Status,
-		nullTime(b.PayDeadline), nullTime(b.PaidAt), nullTime(b.RefundedAt), b.CancelReason,
+		nullTime(b.PayDeadline), nullTime(b.PaidAt), nullTime(b.RefundRequestedAt), nullTime(b.RefundedAt), b.CancelReason,
 		b.ID, from)
 	if isDuplicate(err) {
 		return ErrSlotTaken

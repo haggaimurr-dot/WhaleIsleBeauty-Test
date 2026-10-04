@@ -205,6 +205,24 @@ export interface Booking {
   payDeadline?: Timestamp
   /** 仅 cancelled 有，前端据此说明为什么取消了 */
   cancelReason?: CancelReason
+  /** 仅付过定金后取消的有：定金原路退回的进度 */
+  refund?: Refund
+}
+
+/**
+ * 退款进度：processing（已向微信发起，钱还在路上）→ succeeded（已退回客人的付款账户）。
+ * 微信零钱一般几分钟内到账，银行卡 1–3 个工作日
+ */
+export type RefundStatus = 'processing' | 'succeeded'
+
+export interface Refund {
+  /** 退回的金额，等于定金 */
+  amount: Cents
+  status: RefundStatus
+  /** 发起退款的时间，也就是取消的时间 */
+  createdAt: Timestamp
+  /** 仅 succeeded 有：退回到账的时间 */
+  succeededAt?: Timestamp
 }
 
 /**

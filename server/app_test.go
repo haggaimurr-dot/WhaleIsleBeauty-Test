@@ -161,8 +161,34 @@ func TestCancelPaidRefunds(t *testing.T) {
 		t.Fatal(err)
 	}
 	row, _ := a.store.Booking(ctx, b.ID)
-	if row.RefundedAt == nil || row.CancelReason != ReasonCustomer {
+	if row.RefundRequestedAt == nil || row.CancelReason != ReasonCustomer {
 		t.Fatalf("want refunded customer cancel, got %+v", row)
+	}
+}
+
+func TestRefundProgress(t *testing.T) {
+	a, c := newTestApp(t)
+	ctx := context.Background()
+	u := user(t, a, "o-alice")
+	b := paid(t, a, u, "2026-10-05", "09:00")
+	got, err := a.CancelBooking(ctx, u, b.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Refund == nil || got.Refund.Status != "processing" || got.Refund.Amount != b.Deposit || got.Refund.SucceededAt != "" {
+		t.Fatalf("want processing refund, got %+v", got.Refund)
+	}
+
+	c.advance(fakeRefundDelay)
+	got, _ = a.GetBooking(ctx, u, b.ID)
+	if got.Refund == nil || got.Refund.Status != "succeeded" || got.Refund.SucceededAt != ts(c.t) {
+		t.Fatalf("want succeeded refund, got %+v", got.Refund)
+	}
+
+	// 没付过定金的取消不退款
+	unpaid := book(t, a, u, "2026-10-05", "09:00")
+	if got, err := a.CancelBooking(ctx, u, unpaid.ID); err != nil || got.Refund != nil {
+		t.Fatalf("unpaid should not refund, got %+v %v", got.Refund, err)
 	}
 }
 

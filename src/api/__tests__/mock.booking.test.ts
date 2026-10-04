@@ -50,6 +50,7 @@ describe('待付定金', () => {
     expect(b.canCancel).toBe(true)
     const cancelled = await api.cancelBooking(b.id)
     expect(cancelled.cancelReason).toBe('customer')
+    expect(cancelled.refund).toBeUndefined() // 没付过，不用退
   })
 
   it('可以继续付定金，付完变成等待确认', async () => {
@@ -122,6 +123,31 @@ describe('取消和改期', () => {
   })
 })
 
+describe('退款进度', () => {
+  it('付过定金后取消：先是退款中，两分钟后到账，进度在“已完成”里看', async () => {
+    const date = await day(3)
+    const { booking } = await api.createBooking({ serviceId: 's1', artistId: 'a1', date, time: await freeSlot('a1', date) })
+    await simulatePaid(booking.id)
+    const cancelled = await api.cancelBooking(booking.id)
+    expect(cancelled.refund).toMatchObject({ amount: booking.deposit, status: 'processing' })
+    expect(cancelled.refund!.succeededAt).toBeUndefined()
+
+    vi.setSystemTime(Date.parse(cancelled.refund!.createdAt) + 2 * 60 * 1000)
+    const past = (await api.listMyBookings('past')).find(x => x.id === booking.id)!
+    expect(past.refund).toMatchObject({ status: 'succeeded', createdAt: cancelled.refund!.createdAt })
+    expect(Date.parse(past.refund!.succeededAt!) - Date.parse(past.refund!.createdAt)).toBe(2 * 60 * 1000)
+  })
+
+  it('超时没付的没有退款；已完成的也没有', async () => {
+    const date = await day(2)
+    const { booking } = await api.createBooking({ serviceId: 's1', artistId: 'a1', date, time: await freeSlot('a1', date) })
+    vi.setSystemTime(Date.now() + 16 * 60 * 1000)
+    const past = await api.listMyBookings('past')
+    expect(past.find(x => x.id === booking.id)!.refund).toBeUndefined()
+    expect(past.filter(x => x.status === 'completed').every(x => !x.refund)).toBe(true)
+  })
+})
+
 describe('自动取消：到时间店里还没确认', () => {
   it('没确认的取消并记为 not_confirmed；已确认的过了结束时间算完成', async () => {
     const date = await day(0)
@@ -134,7 +160,11 @@ describe('自动取消：到时间店里还没确认', () => {
     await api.confirmBooking(b.id)
 
     vi.setSystemTime(new Date(2026, 9, 1, 23, 0))
-    expect(await api.getBooking(a.id)).toMatchObject({ status: 'cancelled', cancelReason: 'not_confirmed' })
+    expect(await api.getBooking(a.id)).toMatchObject({
+      status: 'cancelled', cancelReason: 'not_confirmed',
+      // 从开始时间算起，早就到账了
+      refund: { status: 'succeeded', createdAt: new Date(`${date}T${tA}:00`).toISOString() },
+    })
     expect((await api.getBooking(b.id)).status).toBe('completed')
     expect((await api.listMyBookings('upcoming')).some(x => x.id === a.id)).toBe(false)
   })

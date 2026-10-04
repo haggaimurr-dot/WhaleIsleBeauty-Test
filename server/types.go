@@ -72,24 +72,33 @@ type SlotView struct {
 }
 
 type Booking struct {
-	ID           string `json:"id"`
-	ServiceID    string `json:"serviceId"`
-	ServiceName  string `json:"serviceName"`
-	ArtistID     string `json:"artistId"`
-	ArtistName   string `json:"artistName"`
-	Date         string `json:"date"`
-	Time         string `json:"time"`
-	DurationMin  int    `json:"durationMin"`
-	Price        int    `json:"price"`
-	Deposit      int    `json:"deposit"`
-	Status       string `json:"status"`
-	Occasion     string `json:"occasion,omitempty"`
-	SkinType     string `json:"skinType,omitempty"`
-	Note         string `json:"note,omitempty"`
-	CreatedAt    string `json:"createdAt"`
-	CanCancel    bool   `json:"canCancel"`
-	PayDeadline  string `json:"payDeadline,omitempty"`
-	CancelReason string `json:"cancelReason,omitempty"`
+	ID           string  `json:"id"`
+	ServiceID    string  `json:"serviceId"`
+	ServiceName  string  `json:"serviceName"`
+	ArtistID     string  `json:"artistId"`
+	ArtistName   string  `json:"artistName"`
+	Date         string  `json:"date"`
+	Time         string  `json:"time"`
+	DurationMin  int     `json:"durationMin"`
+	Price        int     `json:"price"`
+	Deposit      int     `json:"deposit"`
+	Status       string  `json:"status"`
+	Occasion     string  `json:"occasion,omitempty"`
+	SkinType     string  `json:"skinType,omitempty"`
+	Note         string  `json:"note,omitempty"`
+	CreatedAt    string  `json:"createdAt"`
+	CanCancel    bool    `json:"canCancel"`
+	PayDeadline  string  `json:"payDeadline,omitempty"`
+	CancelReason string  `json:"cancelReason,omitempty"`
+	Refund       *Refund `json:"refund,omitempty"`
+}
+
+// Refund 定金原路退回的进度，仅付过定金后取消的预约有
+type Refund struct {
+	Amount      int    `json:"amount"`
+	Status      string `json:"status"` // processing | succeeded
+	CreatedAt   string `json:"createdAt"`
+	SucceededAt string `json:"succeededAt,omitempty"`
 }
 
 type CreateBookingReq struct {

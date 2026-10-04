@@ -30,28 +30,30 @@ type User struct {
 
 // BookingRow 是存储里的预约。时间都用 UTC 存
 type BookingRow struct {
-	ID           string
-	UserID       string
-	ServiceID    string
-	ServiceName  string
-	ArtistID     string
-	ArtistName   string
-	Date         string
-	Time         string
-	StartAt      time.Time
-	EndAt        time.Time
-	DurationMin  int
-	Price        int
-	Deposit      int
-	Status       string
-	Occasion     string
-	SkinType     string
-	Note         string
-	CreatedAt    time.Time
-	PayDeadline  *time.Time
-	PaidAt       *time.Time
-	RefundedAt   *time.Time
-	CancelReason string
+	ID          string
+	UserID      string
+	ServiceID   string
+	ServiceName string
+	ArtistID    string
+	ArtistName  string
+	Date        string
+	Time        string
+	StartAt     time.Time
+	EndAt       time.Time
+	DurationMin int
+	Price       int
+	Deposit     int
+	Status      string
+	Occasion    string
+	SkinType    string
+	Note        string
+	CreatedAt   time.Time
+	PayDeadline *time.Time
+	PaidAt      *time.Time
+	// RefundRequestedAt 发起退款的时间；RefundedAt 退款到账的时间（假支付时是预计到账时间，可能还在将来）
+	RefundRequestedAt *time.Time
+	RefundedAt        *time.Time
+	CancelReason      string
 }
 
 func slotKey(artistID, date, t string) string { return artistID + "|" + date + "|" + t }
